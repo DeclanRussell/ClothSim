@@ -1,0 +1,142 @@
+\hypertarget{class_render_target_lib}{\section{Render\-Target\-Lib Class Reference}
+\label{class_render_target_lib}\index{Render\-Target\-Lib@{Render\-Target\-Lib}}
+}
+
+
+Singleton class for creating and storing render targets in a library.  
+
+
+
+
+{\ttfamily \#include $<$Render\-Target\-Lib.\-h$>$}
+
+
+
+Collaboration diagram for Render\-Target\-Lib\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[height=550pt]{class_render_target_lib__coll__graph}
+\end{center}
+\end{figure}
+\subsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hyperlink{class_render_buffer}{Render\-Buffer} $\ast$ \hyperlink{class_render_target_lib_a0ff27ec9ae3c085a2bce4e05c180e0e3}{add\-Render\-Buffer} (std\-::string \-\_\-name, G\-Lenum \-\_\-internalformat, G\-Lenum \-\_\-attachment, G\-Lsizei \-\_\-width, G\-Lsizei \-\_\-height)
+\begin{DoxyCompactList}\small\item\em add a render buffer to our library \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_ac5971bca0f97cedf1e7c16d8d1233fdc}{\hyperlink{class_frame_buffer}{Frame\-Buffer} $\ast$ \hyperlink{class_render_target_lib_ac5971bca0f97cedf1e7c16d8d1233fdc}{add\-Frame\-Buffer} (std\-::string \-\_\-name)}\label{class_render_target_lib_ac5971bca0f97cedf1e7c16d8d1233fdc}
+
+\begin{DoxyCompactList}\small\item\em add a frame buffer to our library \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_a30afc5063831926612da80726dea0f04}{\hyperlink{class_frame_buffer}{Frame\-Buffer} $\ast$ \hyperlink{class_render_target_lib_a30afc5063831926612da80726dea0f04}{get\-Frame\-Buffer} (const std\-::string \&\-\_\-name)}\label{class_render_target_lib_a30afc5063831926612da80726dea0f04}
+
+\begin{DoxyCompactList}\small\item\em gets a frame buffer from our library \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_a9695e1a845c84e76c10bec26460b0e8b}{\hyperlink{class_frame_buffer}{Frame\-Buffer} $\ast$ \hyperlink{class_render_target_lib_a9695e1a845c84e76c10bec26460b0e8b}{get\-Frame\-Buffer} (const char $\ast$\-\_\-name)}\label{class_render_target_lib_a9695e1a845c84e76c10bec26460b0e8b}
+
+\begin{DoxyCompactList}\small\item\em gets a frame buffer from our library \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_acf1fa30e68dc74deca512b0c77786d0a}{\hyperlink{class_render_buffer}{Render\-Buffer} $\ast$ \hyperlink{class_render_target_lib_acf1fa30e68dc74deca512b0c77786d0a}{get\-Render\-Buffer} (const std\-::string \&\-\_\-name)}\label{class_render_target_lib_acf1fa30e68dc74deca512b0c77786d0a}
+
+\begin{DoxyCompactList}\small\item\em gets a render buffer from our library \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_aeda9a8138eef8e87558431809933074b}{\hyperlink{class_render_buffer}{Render\-Buffer} $\ast$ \hyperlink{class_render_target_lib_aeda9a8138eef8e87558431809933074b}{get\-Render\-Buffer} (const char $\ast$\-\_\-name)}\label{class_render_target_lib_aeda9a8138eef8e87558431809933074b}
+
+\begin{DoxyCompactList}\small\item\em gets a render buffer from our library \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_a71b6707d4e877c56cf167bee8995ff6a}{void \hyperlink{class_render_target_lib_a71b6707d4e877c56cf167bee8995ff6a}{destroy} ()}\label{class_render_target_lib_a71b6707d4e877c56cf167bee8995ff6a}
+
+\begin{DoxyCompactList}\small\item\em Deletes our library. \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Static Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{class_render_target_lib_a99e969c4379b3c037b3152ae4603e436}{static \hyperlink{class_render_target_lib}{Render\-Target\-Lib} $\ast$ \hyperlink{class_render_target_lib_a99e969c4379b3c037b3152ae4603e436}{get\-Instance} ()}\label{class_render_target_lib_a99e969c4379b3c037b3152ae4603e436}
+
+\begin{DoxyCompactList}\small\item\em returns an instance of our render target library \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Private Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{class_render_target_lib_a0ae1e327dc608b42223cf41de7363110}{\hyperlink{class_render_target_lib_a0ae1e327dc608b42223cf41de7363110}{$\sim$\-Render\-Target\-Lib} ()}\label{class_render_target_lib_a0ae1e327dc608b42223cf41de7363110}
+
+\begin{DoxyCompactList}\small\item\em our destructor. Removes all render targets from library \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_aca1daab0d875c1e27e95d290851b1870}{\hyperlink{class_render_target_lib_aca1daab0d875c1e27e95d290851b1870}{Render\-Target\-Lib} ()}\label{class_render_target_lib_aca1daab0d875c1e27e95d290851b1870}
+
+\begin{DoxyCompactList}\small\item\em our default constructor. Don't want this to be accessable as this is a singleton class \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Private Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{class_render_target_lib_a10a29d0f5456445891d686049699ec14}{\hyperlink{class_frame_buffer}{Frame\-Buffer} $\ast$ \hyperlink{class_render_target_lib_a10a29d0f5456445891d686049699ec14}{m\-\_\-current\-Framebuffer}}\label{class_render_target_lib_a10a29d0f5456445891d686049699ec14}
+
+\begin{DoxyCompactList}\small\item\em the current frame buffer in use \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_ab83afcc7cb835abfe5eaef18c135c6e5}{std\-::string \hyperlink{class_render_target_lib_ab83afcc7cb835abfe5eaef18c135c6e5}{m\-\_\-current\-Framebuffer\-Name}}\label{class_render_target_lib_ab83afcc7cb835abfe5eaef18c135c6e5}
+
+\begin{DoxyCompactList}\small\item\em the current frame buffer in use name \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_a10c9a7121f740588615e8b56da595268}{\hyperlink{class_render_buffer}{Render\-Buffer} $\ast$ \hyperlink{class_render_target_lib_a10c9a7121f740588615e8b56da595268}{m\-\_\-current\-Renderbuffer}}\label{class_render_target_lib_a10c9a7121f740588615e8b56da595268}
+
+\begin{DoxyCompactList}\small\item\em the current render buffer in use \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_af87a49cf916ae0bcf5b5581fa630c976}{std\-::string \hyperlink{class_render_target_lib_af87a49cf916ae0bcf5b5581fa630c976}{m\-\_\-current\-Renderbuffer\-Name}}\label{class_render_target_lib_af87a49cf916ae0bcf5b5581fa630c976}
+
+\begin{DoxyCompactList}\small\item\em the current render buffer in use name \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_ae448ca67b07b4063d7c599eb9d8648e8}{std\-::map$<$ std\-::string, \\*
+\hyperlink{class_render_buffer}{Render\-Buffer} $\ast$ $>$ \hyperlink{class_render_target_lib_ae448ca67b07b4063d7c599eb9d8648e8}{m\-\_\-render\-Buffers}}\label{class_render_target_lib_ae448ca67b07b4063d7c599eb9d8648e8}
+
+\begin{DoxyCompactList}\small\item\em mip map for storing our render buffers \end{DoxyCompactList}\item 
+\hypertarget{class_render_target_lib_af046f7ba4ccb1a5750594ae3f3d4ce3a}{std\-::map$<$ std\-::string, \\*
+\hyperlink{class_frame_buffer}{Frame\-Buffer} $\ast$ $>$ \hyperlink{class_render_target_lib_af046f7ba4ccb1a5750594ae3f3d4ce3a}{m\-\_\-frame\-Buffers}}\label{class_render_target_lib_af046f7ba4ccb1a5750594ae3f3d4ce3a}
+
+\begin{DoxyCompactList}\small\item\em mip map for storing our frame buffers \end{DoxyCompactList}\end{DoxyCompactItemize}
+\subsection*{Static Private Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\hypertarget{class_render_target_lib_a010764661d409ec73902e644e9825a1f}{static \hyperlink{class_render_target_lib}{Render\-Target\-Lib} $\ast$ \hyperlink{class_render_target_lib_a010764661d409ec73902e644e9825a1f}{m\-\_\-instance}}\label{class_render_target_lib_a010764661d409ec73902e644e9825a1f}
+
+\begin{DoxyCompactList}\small\item\em our static instance of our render target library \end{DoxyCompactList}\end{DoxyCompactItemize}
+
+
+\subsection{Detailed Description}
+Singleton class for creating and storing render targets in a library. 
+
+\begin{DoxyAuthor}{Author}
+Declan Russell 
+\end{DoxyAuthor}
+\begin{DoxyDate}{Date}
+28/04/2015 
+\end{DoxyDate}
+\begin{DoxyVersion}{Version}
+1.\-0 
+\end{DoxyVersion}
+
+
+\subsection{Member Function Documentation}
+\hypertarget{class_render_target_lib_a0ff27ec9ae3c085a2bce4e05c180e0e3}{\index{Render\-Target\-Lib@{Render\-Target\-Lib}!add\-Render\-Buffer@{add\-Render\-Buffer}}
+\index{add\-Render\-Buffer@{add\-Render\-Buffer}!RenderTargetLib@{Render\-Target\-Lib}}
+\subsubsection[{add\-Render\-Buffer}]{\setlength{\rightskip}{0pt plus 5cm}{\bf Render\-Buffer} $\ast$ Render\-Target\-Lib\-::add\-Render\-Buffer (
+\begin{DoxyParamCaption}
+\item[{std\-::string}]{\-\_\-name, }
+\item[{G\-Lenum}]{\-\_\-internalformat, }
+\item[{G\-Lenum}]{\-\_\-attachment, }
+\item[{G\-Lsizei}]{\-\_\-width, }
+\item[{G\-Lsizei}]{\-\_\-height}
+\end{DoxyParamCaption}
+)}}\label{class_render_target_lib_a0ff27ec9ae3c085a2bce4e05c180e0e3}
+
+
+add a render buffer to our library 
+
+
+\begin{DoxyParams}{Parameters}
+{\em \-\_\-name} & -\/ the name of our render buffer \\
+\hline
+\end{DoxyParams}
+
+
+Here is the caller graph for this function\-:\nopagebreak
+\begin{figure}[H]
+\begin{center}
+\leavevmode
+\includegraphics[width=346pt]{class_render_target_lib_a0ff27ec9ae3c085a2bce4e05c180e0e3_icgraph}
+\end{center}
+\end{figure}
+
+
+
+
+The documentation for this class was generated from the following files\-:\begin{DoxyCompactItemize}
+\item 
+/home/dexternation/\-A\-G\-S\-D\-T\-Fluid\-Sim/include/\hyperlink{_render_target_lib_8h}{Render\-Target\-Lib.\-h}\item 
+/home/dexternation/\-A\-G\-S\-D\-T\-Fluid\-Sim/src/Render\-Target\-Lib.\-cpp\end{DoxyCompactItemize}
