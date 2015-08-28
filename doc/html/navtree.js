@@ -1,32 +1,27 @@
 var NAVTREE =
 [
-  [ "Cuda SPH Fluid Simulation - Declan Russell", "index.html", [
-    [ "AGSDTFluidSim", "md__home_dexternation__a_g_s_d_t_fluid_sim__r_e_a_d_m_e.html", null ],
+  [ "ClothSim", "index.html", [
+    [ "Install instrustions", "md__r_e_a_d_m_e.html", null ],
+    [ "Todo List", "todo.html", null ],
     [ "Classes", null, [
       [ "Class List", "annotated.html", "annotated" ],
       [ "Class Index", "classes.html", null ],
       [ "Class Hierarchy", "hierarchy.html", "hierarchy" ],
       [ "Class Members", "functions.html", [
-        [ "All", "functions.html", "functions_dup" ],
+        [ "All", "functions.html", null ],
         [ "Functions", "functions_func.html", null ],
         [ "Variables", "functions_vars.html", null ]
       ] ]
     ] ],
     [ "Files", null, [
-      [ "File List", "files.html", "files" ],
-      [ "File Members", "globals.html", [
-        [ "All", "globals.html", null ],
-        [ "Functions", "globals_func.html", null ],
-        [ "Variables", "globals_vars.html", null ]
-      ] ]
+      [ "File List", "files.html", "files" ]
     ] ]
   ] ]
 ];
 
 var NAVTREEINDEX =
 [
-".html",
-"class_s_p_h_engine.html"
+".html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

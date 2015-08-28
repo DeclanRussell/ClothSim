@@ -1,13 +1,10 @@
 var class_ui___main_window =
 [
     [ "retranslateUi", "class_ui___main_window.html#a097dd160c3534a204904cb374412c618", null ],
-    [ "retranslateUi", "class_ui___main_window.html#a097dd160c3534a204904cb374412c618", null ],
     [ "setupUi", "class_ui___main_window.html#acf4a0872c4c77d8f43a2ec66ed849b58", null ],
-    [ "setupUi", "class_ui___main_window.html#acf4a0872c4c77d8f43a2ec66ed849b58", null ],
-    [ "centralwidget", "class_ui___main_window.html#a39420100bfee3ba57f137af5a3b0f8e9", null ],
-    [ "gridLayout", "class_ui___main_window.html#ac4586abe48f0aabf940b0dc2df3772ed", null ],
+    [ "centralwidget", "class_ui___main_window.html#a356f1cf3ebda15f1fac59467ee081b74", null ],
+    [ "gridLayout", "class_ui___main_window.html#a525ed3c5fe0784ac502ee222fba4e205", null ],
     [ "horizontalSpacer", "class_ui___main_window.html#a7871ea8c4b6c595d7ccd53960b344719", null ],
-    [ "menubar", "class_ui___main_window.html#a734b1d3bb71c1b8e1ea01b7fa4344fce", null ],
-    [ "statusbar", "class_ui___main_window.html#a07519bbb9a350befd6feb4e84ef299fd", null ],
-    [ "verticalSpacer", "class_ui___main_window.html#a8384329c3663ff274e926a12024aab52", null ]
+    [ "menubar", "class_ui___main_window.html#adf43d9a67adaec750aaa956b5e082f09", null ],
+    [ "statusbar", "class_ui___main_window.html#a1687cceb1e2787aa1f83e50433943a91", null ]
 ];

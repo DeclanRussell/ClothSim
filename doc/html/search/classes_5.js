@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['lightinfo',['lightInfo',['../structlight_info.html',1,'']]]
+  ['openglwidget',['OpenGLWidget',['../class_open_g_l_widget.html',1,'']]]
 ];

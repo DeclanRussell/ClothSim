@@ -1,6 +1,8 @@
 var searchData=
 [
-  ['opendoc',['openDoc',['../class_main_window.html#a452fc3db76653e3355cd9eb81bc4f0cf',1,'MainWindow']]],
-  ['openglwidget',['OpenGLWidget',['../class_open_g_l_widget.html#a60b9008fd7762190918d5e2528a57248',1,'OpenGLWidget']]],
-  ['operator_5b_5d',['operator[]',['../class_g_l_texture_lib.html#aa18a039ee29d50ccd34a7e1f7d24ce5b',1,'GLTextureLib::operator[](const std::string &amp;_name)'],['../class_g_l_texture_lib.html#ab4ab9d6def1eb2acecfbe062686ab98e',1,'GLTextureLib::operator[](const char *_name)']]]
+  ['renderbuffer',['RenderBuffer',['../class_render_buffer.html#ac3494e7208c1b9fee4e0ff61b24d38ee',1,'RenderBuffer']]],
+  ['rendertargetlib',['RenderTargetLib',['../class_render_target_lib.html#aca1daab0d875c1e27e95d290851b1870',1,'RenderTargetLib']]],
+  ['rendertext',['renderText',['../class_text.html#a012d1b8a4a25f06e73091c232eb91fa4',1,'Text']]],
+  ['resize',['resize',['../class_g_l_texture.html#a5b70c5df1d184c9be005b0ed05f1e808',1,'GLTexture::resize()'],['../class_render_buffer.html#a7dfe2482e11ec51c8ebd687d9ff0a045',1,'RenderBuffer::resize()']]],
+  ['resizegl',['resizeGL',['../class_open_g_l_widget.html#a55cf4659a7f10207fb6ab3fcf9273abc',1,'OpenGLWidget']]]
 ];
