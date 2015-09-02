@@ -3,7 +3,8 @@
 #include <QFileDialog>
 #include <QPushButton>
 #include <QDesktopServices>
-
+#include <QDoubleSpinBox>
+#include <QLabel>
 
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow){
@@ -20,9 +21,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     m_openGLWidget = new OpenGLWidget(format,this);
     ui->gridLayout->addWidget(m_openGLWidget,0,0,7,1);
 
+    //simulation settings
+    QGroupBox *setGrb = new QGroupBox("Simualtion Settings",this);
+    ui->gridLayout->addWidget(setGrb,8,0,1,1);
+    QGridLayout *setLayout = new QGridLayout(setGrb);
+    setGrb->setLayout(setLayout);
+
+    //rest length field
+    setLayout->addWidget(new QLabel("Rest Length: ",setGrb),0,0,1,1);
+    QDoubleSpinBox *restSpn = new QDoubleSpinBox(setGrb);
+    setLayout->addWidget(restSpn,0,1,1,1);
+    restSpn->setDecimals(5);
+    connect(restSpn,SIGNAL(valueChanged(double)),m_openGLWidget,SLOT(setRestLen(float)));
+
     //Group box for our general UI buttons
     QGroupBox *docGrb = new QGroupBox("General:",this);
-    ui->gridLayout->addWidget(docGrb,8,0,1,1);
+    ui->gridLayout->addWidget(docGrb,9,0,1,1);
     QGridLayout *docLayout = new QGridLayout(docGrb);
     docGrb->setLayout(docLayout);
 

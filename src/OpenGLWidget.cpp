@@ -2,6 +2,10 @@
 #include <QGuiApplication>
 #include <iostream>
 #include <time.h>
+#include <glm/gtc/matrix_inverse.hpp>
+#include <GLTextureLib.h>
+
+#define DtoR 0.0174532925f
 
 //----------------------------------------------------------------------------------------------------------------------
 /// @brief the increment for x/y translation with mouse movement
@@ -30,6 +34,8 @@ OpenGLWidget::OpenGLWidget(const QGLFormat _format, QWidget *_parent) : QGLWidge
 OpenGLWidget::~OpenGLWidget(){
     delete m_text;
     delete m_cam;
+    //Destroy our singleton classes
+    GLTextureLib::getInstance()->destroy();
 }
 //----------------------------------------------------------------------------------------------------------------------
 void OpenGLWidget::initializeGL(){
@@ -64,14 +70,20 @@ void OpenGLWidget::initializeGL(){
     // Now we will create a basic Camera from the graphics library
     // This is a static camera so it only needs to be set once
     // First create Values for the camera position
-    glm::vec3 from(5,0,15);
-    glm::vec3 to(5,0,0);
+    glm::vec3 from(0,0,10);
+    glm::vec3 to(0,0,0);
     glm::vec3 up(0,1,0);
     m_cam = new Camera(from,to,up);
     // set the shape using FOV 45 Aspect Ratio based on Width and Height
     // The final two are near and far clipping planes of 0.1 and 100
     m_cam->setShape(45.f,width(),height(),1.f,100.f);
 
+    //Initialize my texture library
+    GLTextureLib::getInstance();
+
+    m_clothSim = new ClothSim(10,10);
+    m_clothSim->setTexture("textures/Luke.bmp");
+    glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
 
     m_currentTime = m_currentTime.currentTime();
     startTimer(0);
@@ -85,6 +97,12 @@ void OpenGLWidget::resizeGL(const int _w, const int _h){
 }
 //----------------------------------------------------------------------------------------------------------------------
 void OpenGLWidget::timerEvent(QTimerEvent *){
+    // calculate the framerate
+    QTime newTime = m_currentTime.currentTime();
+    int msecsPassed = m_currentTime.msecsTo(newTime);
+    m_currentTime = m_currentTime.currentTime();
+    //m_clothSim->update((float)msecsPassed/1000.f);
+    //m_clothSim->update(0.0001);
     updateGL();
 }
 //----------------------------------------------------------------------------------------------------------------------
@@ -98,6 +116,19 @@ void OpenGLWidget::paintGL(){
     QTime newTime = m_currentTime.currentTime();
     int msecsPassed = m_currentTime.msecsTo(newTime);
     m_currentTime = m_currentTime.currentTime();
+
+    glm::mat4 rotx, roty;
+    rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+    roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+
+    glm::mat4 M = rotx*roty;
+    M[3][0] = m_modelPos.x;
+    M[3][1] = m_modelPos.y;
+    M[3][2] = m_modelPos.z;
+    glm::mat4 V = m_cam->getViewMatrix();
+    glm::mat4 P = m_cam->getProjectionMatrix();
+    glm::mat3 norm = glm::inverseTranspose(glm::mat3(V*M));
+    m_clothSim->draw(P*V*M,P*V*M,norm);
 
 
     //write our framerate
@@ -121,10 +152,17 @@ void OpenGLWidget::keyPressEvent(QKeyEvent *_event){
     if(_event->key()==Qt::Key_Escape){
         QGuiApplication::exit();
     }
+    switch(_event->key())
+    {
+    case(Qt::Key_E) :m_clothSim->update(0.0001); break;
+    case(Qt::Key_W) :glPolygonMode(GL_FRONT_AND_BACK,GL_LINE); break;
+    case(Qt::Key_S) : glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); break;
+    }
 }
 //----------------------------------------------------------------------------------------------------------------------
 void OpenGLWidget::mouseMoveEvent (QMouseEvent * _event)
 {
+
     // note the method buttons() is the button state when event was called
     // this is different from button() which is used to check which button was
     // pressed when the mousePress/Release event is generated
