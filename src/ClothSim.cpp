@@ -257,50 +257,54 @@ void ClothSim::createPlane(int _width, int _height)
                 continue;
             }
 
+            // The corners only have 2 neighbours
+            if((x==m_width-1&&y==0)||(x==m_width-1&&y==m_height-1))
+            {
+                p.numN = 2;
+                (x==0)? p.nIdx[0] = p.idx + 1 : p.nIdx[0] = p.idx - 1;
+                (y==0)? p.nIdx[1] = p.idx + m_width : p.nIdx[1] = p.idx - m_width;
+                //std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<std::endl;
+                partData2.push_back(p);
+                continue;
+            }
+
             // if the middle section of our cloth which will all have 4 neighbours
-            if((x>1 && x<m_width-2)&&(y>1 && y<m_height-2))
+            if((x>0 && x<m_width-1)&&(y>0 && y<m_height-1))
             {
                 p.numN = 4;
                 p.nIdx[0] = p.idx - 1;
                 p.nIdx[1] = p.idx + 1;
                 p.nIdx[2] = p.idx - m_width;
                 p.nIdx[3] = p.idx + m_width;
-                std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<","<<p.nIdx[3]<<std::endl;
+                //std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<","<<p.nIdx[3]<<std::endl;
                 partData4.push_back(p);
             }
             else
             {
                 // not the corners there are 3 neighbours
-                if((x!=m_width-1&&y!=0)||(x!=m_width-1&&y!=m_height-1))
+                p.numN = 3;
+                if(y==0||y==m_height-1)
                 {
-                    p.numN = 3;
-                    if(y==0||y==m_height-1)
-                    {
-                        p.nIdx[0]=p.idx+1;
-                        p.nIdx[1]=p.idx-1;
-                        (y==0) ? p.nIdx[2] = p.idx+m_width : p.nIdx[2] = p.idx-m_width;
-                    }
-                    else
-                    {
-                        (x==0)? p.nIdx[0] = p.idx + 1 : p.nIdx[0] = p.idx - 1;
-                        p.nIdx[1] = p.idx + m_width;
-                        p.nIdx[2] = p.idx - m_width;
-                        partData3.push_back(p);
-                    }
-                    std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<std::endl;
+                    p.nIdx[0]=p.idx+1;
+                    p.nIdx[1]=p.idx-1;
+                    (y==0) ? p.nIdx[2] = p.idx+m_width : p.nIdx[2] = p.idx-m_width;
                 }
-                // The corners only have 2 neighbours
                 else
                 {
-                    p.numN = 2;
                     (x==0)? p.nIdx[0] = p.idx + 1 : p.nIdx[0] = p.idx - 1;
-                    (y==0)? p.nIdx[1] = p.idx + m_width : p.nIdx[1] = p.idx - m_width;
-                    std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<std::endl;
-                    partData2.push_back(p);
+                    p.nIdx[1] = p.idx + m_width;
+                    p.nIdx[2] = p.idx - m_width;
+                    partData3.push_back(p);
                 }
+                //std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<std::endl;
+
+
             }
         }
     }
+
+    std::cout<<"Num contraints: "<<constPartData.size()<<std::endl;
+    std::cout<<"Num other part: "<<partData2.size()<<" "<<partData3.size()<<" "<<partData4.size()<<" "<<partData2.size()+partData3.size()+partData4.size()<<std::endl;
 
     // Now lets load the particle information onto our device
     d_particlesBuffers.resize(3);
