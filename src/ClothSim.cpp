@@ -265,6 +265,7 @@ void ClothSim::createPlane(int _width, int _height)
                 p.nIdx[1] = p.idx + 1;
                 p.nIdx[2] = p.idx - m_width;
                 p.nIdx[3] = p.idx + m_width;
+                std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<","<<p.nIdx[3]<<std::endl;
                 partData4.push_back(p);
             }
             else
@@ -277,7 +278,7 @@ void ClothSim::createPlane(int _width, int _height)
                     {
                         p.nIdx[0]=p.idx+1;
                         p.nIdx[1]=p.idx-1;
-                        (y==0) ? p.nIdx[3] = p.idx+m_width : p.nIdx[3] = p.idx-m_width;
+                        (y==0) ? p.nIdx[2] = p.idx+m_width : p.nIdx[2] = p.idx-m_width;
                     }
                     else
                     {
@@ -286,13 +287,15 @@ void ClothSim::createPlane(int _width, int _height)
                         p.nIdx[2] = p.idx - m_width;
                         partData3.push_back(p);
                     }
+                    std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<std::endl;
                 }
-                // The courners only have 2 neighbours
+                // The corners only have 2 neighbours
                 else
                 {
                     p.numN = 2;
                     (x==0)? p.nIdx[0] = p.idx + 1 : p.nIdx[0] = p.idx - 1;
-                    p.nIdx[1] = p.idx - m_width;
+                    (y==0)? p.nIdx[1] = p.idx + m_width : p.nIdx[1] = p.idx - m_width;
+                    std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<std::endl;
                     partData2.push_back(p);
                 }
             }
@@ -343,11 +346,11 @@ void ClothSim::createPhongShader()
     m_shaderProgram->link();
     m_shaderProgram->use();
 
-    glUniform4f(m_shaderProgram->getUniformLoc("light.position"),1.f,1.f,1.f,1.f);
+    glUniform4f(m_shaderProgram->getUniformLoc("light.position"),1.f,1.f,3.f,1.f);
     glUniform3f(m_shaderProgram->getUniformLoc("light.intensity"),.2f,.2f,.2f);
     glUniform3f(m_shaderProgram->getUniformLoc("Kd"),1.f,1.f,1.f);
     glUniform3f(m_shaderProgram->getUniformLoc("Ka"),1.f,1.f,1.f);
-    glUniform3f(m_shaderProgram->getUniformLoc("Ks"),1.f,1.f,1.f);
+    glUniform3f(m_shaderProgram->getUniformLoc("Ks"),0.5f,0.5f,0.5f);
     glUniform1f(m_shaderProgram->getUniformLoc("shininess"),10.f);
 
     //get the locations of our uniforms that we frequently use in our shader

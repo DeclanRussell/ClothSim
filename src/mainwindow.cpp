@@ -40,10 +40,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     QGridLayout *docLayout = new QGridLayout(docGrb);
     docGrb->setLayout(docLayout);
 
+    //Play/Pause button
+    QPushButton *playBtn = new QPushButton("Play/Pause",docGrb);
+    connect(playBtn,SIGNAL(pressed()),m_openGLWidget,SLOT(toggleUpdate()));
+    docLayout->addWidget(playBtn,1,0,1,1);
+
     //open Documation button
     QPushButton *openDocBtn = new QPushButton("Open Documentation",docGrb);
     connect(openDocBtn,SIGNAL(pressed()),this,SLOT(openDoc()));
-    docLayout->addWidget(openDocBtn,1,0,1,1);
+    docLayout->addWidget(openDocBtn,2,0,1,1);
 
 }
 

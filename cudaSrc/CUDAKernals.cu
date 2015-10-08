@@ -20,9 +20,9 @@ __global__ void clothSolverKernal(float3* _posBuffer, particles* _partBuffer, fl
     float3 pos = _posBuffer[part.idx];
 
     // Verlet integeration
-    float3 temp = pos;
+    part.oldP = pos;
     pos +=  pos-part.oldP + gravity*_timeStep*_timeStep;
-    part.oldP = temp;
+
 
     // Satisfy the constrainsts
     // This usees a lot of accesses to global memory which is slow. It would be nice if I could think of a better way
@@ -32,13 +32,14 @@ __global__ void clothSolverKernal(float3* _posBuffer, particles* _partBuffer, fl
     for(int i=0; i<_numN; i++)
     {
         nPos = _posBuffer[part.nIdx[i]];
+        //printf("nPos %f,%f,%f\n",nPos.x,nPos.y,nPos.z);
         delta = nPos - pos;
         deltaLength = length(delta*delta);
         if(deltaLength!=deltaLength)
         {
             printf("fuck fuck fuck\n");
-            printf("idx %d nIdx[%d] %d numN %d\n",part.idx,i,part.nIdx[i],_numN);
-            //printf("Pos %f,%f,%f nPos %f,%f,%f \n",pos.x,pos.y,pos.z,nPos,nPos,nPos);
+            //printf("idx %d nIdx[%d] %d numN %d\n",part.idx,i,part.nIdx[i],_numN);
+            printf("Pos %f,%f,%f nPos %f,%f,%f idx %d\n",pos.x,pos.y,pos.z,nPos.x,nPos.y,nPos.z,part.nIdx[i]);
         }
         diff = (deltaLength-_restLength)/deltaLength;
         delta*=.5f*diff;
@@ -47,7 +48,7 @@ __global__ void clothSolverKernal(float3* _posBuffer, particles* _partBuffer, fl
         //_posBuffer[part.nIdx[i]] = nPos-delta;
         //printf("Delta %f,%f,%f \n",delta.x,delta.y,delta.z);
     }
-    printf("Pos %f,%f,%f \n",pos.x,pos.y,pos.z);
+    //printf("Pos %f,%f,%f \n",pos.x,pos.y,pos.z);
     _posBuffer[part.idx] = pos;
 
 }

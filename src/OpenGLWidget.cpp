@@ -26,6 +26,7 @@ OpenGLWidget::OpenGLWidget(const QGLFormat _format, QWidget *_parent) : QGLWidge
     m_spinXFace=0;
     m_spinYFace=0;
     m_pan = false;
+    m_update = false;
     m_modelPos=glm::vec3(0.0);
     // re-size the widget to that of the parent (in this case the GLFrame passed in on construction)
     this->resize(_parent->size());
@@ -83,6 +84,7 @@ void OpenGLWidget::initializeGL(){
 
     m_clothSim = new ClothSim(10,10);
     m_clothSim->setTexture("textures/Luke.bmp");
+    m_clothSim->setRestLength(1.2);
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
 
     m_currentTime = m_currentTime.currentTime();
@@ -101,7 +103,10 @@ void OpenGLWidget::timerEvent(QTimerEvent *){
     QTime newTime = m_currentTime.currentTime();
     int msecsPassed = m_currentTime.msecsTo(newTime);
     m_currentTime = m_currentTime.currentTime();
-    //m_clothSim->update((float)msecsPassed/1000.f);
+    if(m_update)
+    {
+        m_clothSim->update((float)msecsPassed/1000.f);
+    }
     //m_clothSim->update(0.0001);
     updateGL();
 }
