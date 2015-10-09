@@ -32,7 +32,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     QDoubleSpinBox *restSpn = new QDoubleSpinBox(setGrb);
     setLayout->addWidget(restSpn,0,1,1,1);
     restSpn->setDecimals(5);
-    connect(restSpn,SIGNAL(valueChanged(double)),m_openGLWidget,SLOT(setRestLen(float)));
+    connect(restSpn,SIGNAL(valueChanged(double)),m_openGLWidget,SLOT(setRestLen(double)));
 
     //Group box for our general UI buttons
     QGroupBox *docGrb = new QGroupBox("General:",this);
@@ -45,10 +45,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     connect(playBtn,SIGNAL(pressed()),m_openGLWidget,SLOT(toggleUpdate()));
     docLayout->addWidget(playBtn,1,0,1,1);
 
+    //Reset button
+    QPushButton *resetBtn = new QPushButton("Reset",docGrb);
+    connect(resetBtn,SIGNAL(pressed()),m_openGLWidget,SLOT(resetSim()));
+    docLayout->addWidget(resetBtn,2,0,1,1);
+
     //open Documation button
     QPushButton *openDocBtn = new QPushButton("Open Documentation",docGrb);
     connect(openDocBtn,SIGNAL(pressed()),this,SLOT(openDoc()));
-    docLayout->addWidget(openDocBtn,2,0,1,1);
+    docLayout->addWidget(openDocBtn,3,0,1,1);
 
 }
 

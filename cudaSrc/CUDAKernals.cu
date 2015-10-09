@@ -11,81 +11,112 @@
 #define gravity make_float3(0.f,-9.8f,0.f)
 
 //----------------------------------------------------------------------------------------------------------------------
-/// @brief our cloth solver kernal
+/// @brief verlet intergration solver kernal
 //----------------------------------------------------------------------------------------------------------------------
-__global__ void clothSolverKernal(float3* _posBuffer, particles* _partBuffer, float _restLength, float _mass, int _numN, float _timeStep)
+__global__ void verletIntSolverKernal(float3 *_posBuffer, float3 *_oldPosBuffer, int _numParticles, float _mass, float _timeStep)
 {
-    // Get particle and its position.
-    particles part = _partBuffer[threadIdx.x];
-    float3 pos = _posBuffer[part.idx];
-
-    // Verlet integeration
-    part.oldP = pos;
-    pos +=  pos-part.oldP + gravity*_timeStep*_timeStep;
-
-
-    // Satisfy the constrainsts
-    // This usees a lot of accesses to global memory which is slow. It would be nice if I could think of a better way
-    // to deal with the banking conflicts :(
-    float3 nPos,delta;
-    float deltaLength,diff;
-    for(int i=0; i<_numN; i++)
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(idx<_numParticles)
     {
-        nPos = _posBuffer[part.nIdx[i]];
-        //printf("nPos %f,%f,%f\n",nPos.x,nPos.y,nPos.z);
-        delta = nPos - pos;
-        deltaLength = length(delta*delta);
-        if(deltaLength!=deltaLength)
-        {
-            printf("fuck fuck fuck\n");
-            //printf("idx %d nIdx[%d] %d numN %d\n",part.idx,i,part.nIdx[i],_numN);
-            printf("Pos %f,%f,%f nPos %f,%f,%f idx %d\n",pos.x,pos.y,pos.z,nPos.x,nPos.y,nPos.z,part.nIdx[i]);
-        }
+        float3 pos = _posBuffer[idx];
+        float3 temp = pos;
+        float3 oldPos = _oldPosBuffer[idx];
+        //printf("Verlet Pos %f,%f,%f \n",pos.x,pos.y,pos.z);
+        pos +=  pos-oldPos + gravity*_timeStep*_timeStep;
+        _oldPosBuffer[idx] = temp;
+        _posBuffer[idx] = pos;
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+/// @brief our cloth constraint solver kernal
+//----------------------------------------------------------------------------------------------------------------------
+__global__ void constraintSolverKernal(float3* _posBuffer, constraints* _constraintsBuffer, float _restLength, int _numConstraints)
+{
+    // Compute our thread idx
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(idx<_numConstraints)
+    {
+        // Get particles positions.
+        // This usees a lot of accesses to global memory which is slow. It would be nice if I could think of a better way
+        // to deal with the banking conflicts :(
+        constraints c = _constraintsBuffer[idx];
+        float3 partA = _posBuffer[c.particleA];
+        float3 partB = _posBuffer[c.particleB];
+
+        // Satisfy the constrainsts
+        float3 delta;
+        float deltaLength,diff;
+
+        delta = partB - partA;
+        deltaLength = length(delta);
         diff = (deltaLength-_restLength)/deltaLength;
-        delta*=.5f*diff;
+
+
+        delta*=0.5f*diff;
         //delta *= _restLength*_restLength/(delta*delta+_restLength*_restLength)-.5f;
-        pos+=delta;
-        //_posBuffer[part.nIdx[i]] = nPos-delta;
-        //printf("Delta %f,%f,%f \n",delta.x,delta.y,delta.z);
+
+
+        _posBuffer[c.particleA] = partA+delta;
+        _posBuffer[c.particleB] = partB-delta;
+
     }
-    //printf("Pos %f,%f,%f \n",pos.x,pos.y,pos.z);
-   _posBuffer[part.idx] = pos;
 
 }
 //----------------------------------------------------------------------------------------------------------------------
-__global__ void resetConstPartKernal(float3 *_posBuffer, particles *_partBuffer)
+/// @brief kernal to move the fixed particles back to their old locations
+//----------------------------------------------------------------------------------------------------------------------
+__global__ void resetConstPartKernal(float3 *_posBuffer, float3 *_oldPosBuffer, int *_fixedParticlesBuffer,int _numFixedPoints)
 {
-    // Get particle and its position.
-    particles part = _partBuffer[threadIdx.x];
-    _posBuffer[part.idx] = part.oldP;
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(idx<_numFixedPoints)
+    {
+        // Get particle and its position.
+        int partIdx = _fixedParticlesBuffer[threadIdx.x + blockIdx.x * blockDim.x];
+        _posBuffer[partIdx] = _oldPosBuffer[partIdx];
+    }
 }
 
 //----------------------------------------------------------------------------------------------------------------------
-void clothSolver(cudaStream_t _stream, float3 *_posBuffer, particles *_particleBuffer, int _numParticles, int _numNeighbours, float _restLength, float _mass, float _timeStep, int _maxNumThreads)
-{
-    if(_numParticles>_maxNumThreads)
-    {
-        //calculate how many blocks we want
-        int blocks = ceil(_numParticles/_maxNumThreads)+1;
-        clothSolverKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer,_particleBuffer, _restLength, _mass,_numNeighbours,_timeStep);
-    }
-    else
-    {
-        clothSolverKernal<<<1,_numParticles,0,_stream>>>(_posBuffer,_particleBuffer, _restLength, _mass,_numNeighbours,_timeStep);
-    }
-
-}
-//----------------------------------------------------------------------------------------------------------------------
-void resetConstParticles(float3 *_posBuffer, particles *_particleBuffer, int _numParticles, int _maxNumThreads)
+void clothVerletIntegration(cudaStream_t _stream, float3 *_posBuffer, float3 *_oldPosBuffer, int _numParticles, float _mass, float _timeStep, int _maxNumThreads)
 {
     if(_numParticles>_maxNumThreads)
     {
         //calculate how many blocks we want
         int blocks = ceil(_numParticles/_maxNumThreads)+1;
-        resetConstPartKernal<<<blocks,_maxNumThreads>>>(_posBuffer,_particleBuffer);
+        verletIntSolverKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer, _oldPosBuffer, _numParticles, _mass, _timeStep);
     }
     else
     {
-        resetConstPartKernal<<<1,_numParticles>>>(_posBuffer,_particleBuffer);
+        verletIntSolverKernal<<<1,_numParticles,0,_stream>>>(_posBuffer, _oldPosBuffer, _numParticles, _mass, _timeStep);
     }
 }
+//----------------------------------------------------------------------------------------------------------------------
+void clothConstraintSolver(cudaStream_t _stream, float3 *_posBuffer, constraints *_constraintsBuffer, int _numConstraints, float _restLength, int _maxNumThreads)
+{
+    if(_numConstraints>_maxNumThreads)
+    {
+        //calculate how many blocks we want
+        int blocks = ceil(_numConstraints/_maxNumThreads)+1;
+        constraintSolverKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer,_constraintsBuffer, _restLength, _numConstraints);
+    }
+    else
+    {
+        constraintSolverKernal<<<1,_numConstraints,0,_stream>>>(_posBuffer,_constraintsBuffer, _restLength, _numConstraints);
+    }
+
+}
+//----------------------------------------------------------------------------------------------------------------------
+void resetFixedParticles(cudaStream_t _stream, float3 *_posBuffer, float3 *_oldPosBuffer, int *_fixedParticles, int _numParticles, int _maxNumThreads)
+{
+    if(_numParticles>_maxNumThreads)
+    {
+        //calculate how many blocks we want
+        int blocks = ceil(_numParticles/_maxNumThreads)+1;
+        resetConstPartKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer,_oldPosBuffer,_fixedParticles,_numParticles);
+    }
+    else
+    {
+        resetConstPartKernal<<<1,_numParticles,0,_stream>>>(_posBuffer,_oldPosBuffer,_fixedParticles,_numParticles);
+    }
+}
+

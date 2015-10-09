@@ -43,8 +43,8 @@ ClothSim::ClothSim(int _width, int _height) : m_restLength(1), m_mass(1)
 ClothSim::~ClothSim()
 {
     // Make sure we remember to unregister our cuda resource
-    cudaGraphicsUnregisterResource(m_resourceVerts);
-    cudaGraphicsUnregisterResource(m_resourceNorms);
+    checkCudaErrors(cudaGraphicsUnregisterResource(m_resourceVerts));
+    checkCudaErrors(cudaGraphicsUnregisterResource(m_resourceNorms));
     // Delete our OpenGL buffers and arrays
     glDeleteBuffers(1,&m_VBOidc);
     glDeleteBuffers(1,&m_VBOverts);
@@ -52,15 +52,12 @@ ClothSim::~ClothSim()
     glDeleteBuffers(1,&m_VBOtexCoords);
     glDeleteVertexArrays(1,&m_VAO);
     // Delete our device pointers
-    for(unsigned int i=0; i<d_particlesBuffers.size();i++)
-    {
-       checkCudaErrors(cudaFree(d_particlesBuffers[i].ptr));
-    }
+    for(unsigned int i=0; i<d_constraintBuffers.size(); i++)
+        checkCudaErrors(cudaFree(d_constraintBuffers[i].ptr));
+    checkCudaErrors(cudaFree(d_oldParticlePos));
+    checkCudaErrors(cudaFree(d_fixedPartBuffer));
     // Delete our CUDA streams as well
-    for(unsigned int i=0; i<m_cudaStreams.size();i++)
-    {
-        cudaStreamDestroy(m_cudaStreams[i]);
-    }
+    checkCudaErrors(cudaStreamDestroy(m_cudaStream));
 }
 //----------------------------------------------------------------------------------------------------------------------
 void ClothSim::draw(glm::mat4 _MV, glm::mat4 _MVP, glm::mat3 _normalMat)
@@ -88,17 +85,24 @@ void ClothSim::update(float _timeStep)
     cudaGraphicsMapResources(1,&m_resourceVerts);
     cudaGraphicsResourceGetMappedPointer((void**)&d_posPtr,&d_posSize,m_resourceVerts);
 
-    // Launch our kernals
-    for(unsigned int i=0; i<d_particlesBuffers.size();i++)
-    {
-        clothSolver(m_cudaStreams[i],d_posPtr,d_particlesBuffers[i].ptr,d_particlesBuffers[i].numParticles,d_particlesBuffers[i].numN,m_restLength,m_mass,_timeStep,m_threadsPerBlock);
-    }
+    // Verlet integration
+    clothVerletIntegration(m_cudaStream,d_posPtr,d_oldParticlePos,m_numParticles,m_mass,_timeStep,m_threadsPerBlock);
 
     //make sure all our threads are done
     cudaThreadSynchronize();
 
+
+    for(unsigned int i=0; i<d_constraintBuffers.size(); i++)
+    {
+        // Satisfy our constraints
+        clothConstraintSolver(m_cudaStream,d_posPtr,d_constraintBuffers[i].ptr,d_constraintBuffers[i].numConsts,m_restLength,m_threadsPerBlock);
+
+        //make sure all our threads are done
+        cudaThreadSynchronize();
+    }
+
     //Reset our constrained particles
-    resetConstParticles(d_posPtr,d_constPartBuffer.ptr,d_constPartBuffer.numParticles,m_threadsPerBlock);
+    resetFixedParticles(m_cudaStream,d_posPtr,d_oldParticlePos,d_fixedPartBuffer,m_numFixedParticles,m_threadsPerBlock);
 
     //make sure all our threads are done
     cudaThreadSynchronize();
@@ -126,17 +130,56 @@ void ClothSim::setTexture(QString _loc)
 
 }
 //----------------------------------------------------------------------------------------------------------------------
+void ClothSim::reset()
+{
+    // now loop from bottom left to top right and generate points
+    // Sourced form Jon Macey's NGL library
+    std::vector<float3> vertices;
+    // calculate the deltas for the x,z values of our point
+    float wStep=1.f/(float)m_width;
+    float hStep=1.f/(float)m_height;
+    // now we assume that the grid is centered at 0,0,0 so we make
+    // it flow from -w/2 -d/2
+    float xPos=-0.5;
+    float yPos=0.5;
+    for(int y=0; y<m_height; y++)
+    {
+       for(int x=0; x<m_width; x++)
+       {
+          // grab the colour and use for the Y (height) only use the red channel
+          vertices.push_back(make_float3(xPos*10,yPos*10,0));
+          // calculate the new position
+          yPos-=hStep;
+       }
+
+       // now increment to next x row
+       xPos+=wStep;
+       // we need to re-set the ypos for new row
+       yPos=0.5;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, m_VBOverts);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float3)*vertices.size(), &vertices[0], GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    cudaMemcpy(d_oldParticlePos,&vertices[0],vertices.size()*sizeof(float3),cudaMemcpyHostToDevice);
+
+}
+//----------------------------------------------------------------------------------------------------------------------
 void ClothSim::createPlane(int _width, int _height)
 {
-    std::vector<glm::vec3> vertices;
+    std::vector<float3> vertices;
     std::vector<glm::vec2> texCoords;
 
     m_width = _width;
     m_height = _height;
 
+
     // calculate the deltas for the x,z values of our point
     float wStep=1.f/(float)m_width;
     float hStep=1.f/(float)m_height;
+    m_restLength = 10.f/((m_width+m_height)/2);
+    std::cout<<"rest Length "<<m_restLength<<std::endl;
     // now we assume that the grid is centered at 0,0,0 so we make
     // it flow from -w/2 -d/2
     float xPos=-0.5;
@@ -154,7 +197,7 @@ void ClothSim::createPlane(int _width, int _height)
        {
 
            // grab the colour and use for the Y (height) only use the red channel
-          vertices.push_back(glm::vec3(xPos*m_width,yPos*m_height,0));
+          vertices.push_back(make_float3(xPos*10,yPos*10,0));
           texCoords.push_back(glm::vec2(xTexCoord,yTexCoord));
 
           // calculate the new position
@@ -170,6 +213,7 @@ void ClothSim::createPlane(int _width, int _height)
        yPos=0.5;
        yTexCoord = 1;
     }
+    m_numParticles = vertices.size();
 
     GLuint numTris = (m_height-1)*(m_width-1)*2;
     GLuint *tris = new GLuint[numTris*3];
@@ -198,7 +242,7 @@ void ClothSim::createPlane(int _width, int _height)
     // Put our vertices into an OpenGL buffer
     glGenBuffers(1, &m_VBOverts);
     glBindBuffer(GL_ARRAY_BUFFER, m_VBOverts);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3)*vertices.size(), &vertices[0], GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float3)*vertices.size(), &vertices[0], GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     // create our cuda graphics resource for our vertexs used for our OpenGL interop
@@ -233,105 +277,117 @@ void ClothSim::createPlane(int _width, int _height)
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    // Now lets initialise our particle data
-    // Im going to seperate out these into 3 different arrays as you may have up to 4 neighbours per particle
-    // but with our setup we wont have any with only one neighbour
-    // You will see why I do this with how I have done my CUDA kernals
-    std::vector<particles> constPartData,partData2,partData3,partData4;
+    // Now lets initialise our constraints data
+    std::vector<constraints> constraintData1,constraintData2,constraintData3,constraintData4,constraintData5,constraintData6;
+    bool switch1,switch2;
+    switch1 = switch2 = true;
     for(int y=0; y<m_height; y++)
     {
         for(int x=0; x<m_width; x++)
         {
-            //create a particle
-            particles p;
-            p.acc = make_float3(0,0,0);
-            p.idx = y*m_width + x;
-            p.oldP = make_float3(vertices[p.idx].x,vertices[p.idx].y,vertices[p.idx].z);
-
-            // lets constrain the top 2 corners of particles so there is something for our cloth to hang off
-            if((x==0&&y==0)||(x==0&&y==m_height-1))
+            //create a constraint
+            constraints c;
+            c.particleA = y*m_width + x;
+            //add the horizontal constraint --> =
+            if(x!=m_width-1)
             {
-                p.idx = y*m_width + x;
-                p.numN = 0;
-                constPartData.push_back(p);
-                continue;
-            }
-
-            // The corners only have 2 neighbours
-            if((x==m_width-1&&y==0)||(x==m_width-1&&y==m_height-1))
-            {
-                p.numN = 2;
-                (x==0)? p.nIdx[0] = p.idx + 1 : p.nIdx[0] = p.idx - 1;
-                (y==0)? p.nIdx[1] = p.idx + m_width : p.nIdx[1] = p.idx - m_width;
-                //std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<std::endl;
-                partData2.push_back(p);
-                continue;
-            }
-
-            // if the middle section of our cloth which will all have 4 neighbours
-            if((x>0 && x<m_width-1)&&(y>0 && y<m_height-1))
-            {
-                p.numN = 4;
-                p.nIdx[0] = p.idx - 1;
-                p.nIdx[1] = p.idx + 1;
-                p.nIdx[2] = p.idx - m_width;
-                p.nIdx[3] = p.idx + m_width;
-                //std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<","<<p.nIdx[3]<<std::endl;
-                partData4.push_back(p);
-            }
-            else
-            {
-                // not the corners there are 3 neighbours
-                p.numN = 3;
-                if(y==0||y==m_height-1)
+                c.particleB = c.particleA+1;
+                if (switch1)
                 {
-                    p.nIdx[0]=p.idx+1;
-                    p.nIdx[1]=p.idx-1;
-                    (y==0) ? p.nIdx[2] = p.idx+m_width : p.nIdx[2] = p.idx-m_width;
+                    constraintData1.push_back(c);
+                    switch1=!switch1;
                 }
                 else
                 {
-                    (x==0)? p.nIdx[0] = p.idx + 1 : p.nIdx[0] = p.idx - 1;
-                    p.nIdx[1] = p.idx + m_width;
-                    p.nIdx[2] = p.idx - m_width;
+                    constraintData2.push_back(c);
+                    switch1=!switch1;
                 }
-                partData3.push_back(p);
-                //std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<std::endl;
+
+                // diagonal up right --> //
+                /// @todo diagonal up right springs not working
+                if(y!=0)
+                {
+                    c.particleB = c.particleA-m_width+1;
+                    //constraintData5.push_back(c);
+                    //std::cout<<"//"<<c.particleB<<std::endl;
+                }
+
+            }
+            if(y!=m_height-1)
+            {
+                //add the vertical constraint --> ||
+                c.particleB = c.particleA+m_width;
+                if(switch2)
+                {
+                    constraintData3.push_back(c);
+                }
+                else
+                {
+                    constraintData4.push_back(c);
+                }
+
+                // diagonal down right --> \\
+                /// @todo diagonal down right springs not working
+                if(x!=m_width-1)
+                {
+                    c.particleB = c.particleA+m_width+1;
+                    //constraintData6.push_back(c);
+                    //std::cout<<"\\\\"<<c.particleB<<std::endl;
+                }
+
             }
         }
+        switch2=!switch2;
     }
 
-    std::cout<<"Num contraints: "<<constPartData.size()<<std::endl;
-    std::cout<<"Num other part: "<<partData2.size()<<" "<<partData3.size()<<" "<<partData4.size()<<" "<<partData2.size()+partData3.size()+partData4.size()<<std::endl;
+    std::vector<int> fixedParticles;
+    // the top 2 corners will be addd to our fixed point array so the cloth is attached to something
+    fixedParticles.push_back(0);
+    fixedParticles.push_back(m_width*(m_height-1));
+    m_numFixedParticles = 2;
 
     // Now lets load the particle information onto our device
-    d_particlesBuffers.resize(3);
-    cudaMalloc(&d_particlesBuffers[0].ptr,partData2.size()*sizeof(particles));
-    cudaMemcpy(d_particlesBuffers[0].ptr,&partData2[0],partData2.size()*sizeof(particles),cudaMemcpyHostToDevice);
-    d_particlesBuffers[0].numParticles = partData2.size();
-    d_particlesBuffers[0].numN = 2;
-    cudaMalloc(&d_particlesBuffers[1].ptr,partData3.size()*sizeof(particles));
-    cudaMemcpy(d_particlesBuffers[1].ptr,&partData3[0],partData3.size()*sizeof(particles),cudaMemcpyHostToDevice);
-    d_particlesBuffers[1].numParticles = partData3.size();
-    d_particlesBuffers[1].numN = 3;
-    cudaMalloc(&d_particlesBuffers[2].ptr,partData4.size()*sizeof(particles));
-    cudaMemcpy(d_particlesBuffers[2].ptr,&partData4[0],partData4.size()*sizeof(particles),cudaMemcpyHostToDevice);
-    d_particlesBuffers[2].numParticles = partData4.size();
-    d_particlesBuffers[2].numN = 4;
+    // Fixed point indecies
+    cudaMalloc(&d_fixedPartBuffer,fixedParticles.size()*sizeof(int));
+    cudaMemcpy(d_fixedPartBuffer,&fixedParticles[0],fixedParticles.size()*sizeof(int),cudaMemcpyHostToDevice);
 
-    // New buffer for our constrained particles
-    cudaMalloc(&d_constPartBuffer.ptr,constPartData.size()*sizeof(particles));
-    cudaMemcpy(d_constPartBuffer.ptr,&constPartData[0],constPartData.size()*sizeof(particles),cudaMemcpyHostToDevice);
-    d_constPartBuffer.numParticles = constPartData.size();
-    d_constPartBuffer.numN = 0;
+    // Our old positions buffer
+    cudaMalloc(&d_oldParticlePos,vertices.size()*sizeof(float3));
+    cudaMemcpy(d_oldParticlePos,&vertices[0],vertices.size()*sizeof(float3),cudaMemcpyHostToDevice);
 
-    // Create our CUDA streams to run our kernals on. This helps with running kernals concurrently.
-    // This is something you will not get taught by richard! Check them out at http://on-demand.gputechconf.com/gtc-express/2011/presentations/StreamsAndConcurrencyWebinar.pdf
-    m_cudaStreams.resize(3);
-    for(int i=0;i<3;i++)
-    {
-        cudaStreamCreate(&m_cudaStreams[i]);
+    // Our constraint data
+    d_constraintBuffers.resize(6);
+    cudaMalloc(&d_constraintBuffers[0].ptr,constraintData1.size()*sizeof(constraints));
+    cudaMemcpy(d_constraintBuffers[0].ptr,&constraintData1[0],constraintData1.size()*sizeof(constraints),cudaMemcpyHostToDevice);
+    d_constraintBuffers[0].numConsts = constraintData1.size();
+
+    cudaMalloc(&d_constraintBuffers[1].ptr,constraintData2.size()*sizeof(constraints));
+    cudaMemcpy(d_constraintBuffers[1].ptr,&constraintData2[0],constraintData2.size()*sizeof(constraints),cudaMemcpyHostToDevice);
+    d_constraintBuffers[1].numConsts = constraintData2.size();
+
+    cudaMalloc(&d_constraintBuffers[2].ptr,constraintData3.size()*sizeof(constraints));
+    cudaMemcpy(d_constraintBuffers[2].ptr,&constraintData3[0],constraintData3.size()*sizeof(constraints),cudaMemcpyHostToDevice);
+    d_constraintBuffers[2].numConsts = constraintData3.size();
+
+    cudaMalloc(&d_constraintBuffers[3].ptr,constraintData4.size()*sizeof(constraints));
+    cudaMemcpy(d_constraintBuffers[3].ptr,&constraintData4[0],constraintData4.size()*sizeof(constraints),cudaMemcpyHostToDevice);
+    d_constraintBuffers[3].numConsts = constraintData4.size();
+
+    cudaMalloc(&d_constraintBuffers[4].ptr,constraintData5.size()*sizeof(constraints));
+    cudaMemcpy(d_constraintBuffers[4].ptr,&constraintData5[0],constraintData5.size()*sizeof(constraints),cudaMemcpyHostToDevice);
+    d_constraintBuffers[4].numConsts = constraintData5.size();
+
+    cudaMalloc(&d_constraintBuffers[5].ptr,constraintData6.size()*sizeof(constraints));
+    cudaMemcpy(d_constraintBuffers[5].ptr,&constraintData6[0],constraintData6.size()*sizeof(constraints),cudaMemcpyHostToDevice);
+    d_constraintBuffers[5].numConsts = constraintData6.size();
+
+    for(int i=0;i<d_constraintBuffers.size();i++){
+        std::cout<<d_constraintBuffers[i].numConsts<<std::endl;
     }
+
+    // Create our CUDA stream to run our kernals on. This helps with running kernals concurrently.
+    // This is something you will not get taught by richard! Check them out at http://on-demand.gputechconf.com/gtc-express/2011/presentations/StreamsAndConcurrencyWebinar.pdf
+    cudaStreamCreate(&m_cudaStream);
 
     std::cout<<"numVerts is "<<vertices.size()<<std::endl;
 
@@ -350,8 +406,8 @@ void ClothSim::createPhongShader()
 
     glUniform4f(m_shaderProgram->getUniformLoc("light.position"),1.f,1.f,3.f,1.f);
     glUniform3f(m_shaderProgram->getUniformLoc("light.intensity"),.2f,.2f,.2f);
-    glUniform3f(m_shaderProgram->getUniformLoc("Kd"),1.f,1.f,1.f);
-    glUniform3f(m_shaderProgram->getUniformLoc("Ka"),1.f,1.f,1.f);
+    glUniform3f(m_shaderProgram->getUniformLoc("Kd"),0.7f,0.7f,0.7f);
+    glUniform3f(m_shaderProgram->getUniformLoc("Ka"),0.7f,0.7f,0.7f);
     glUniform3f(m_shaderProgram->getUniformLoc("Ks"),0.5f,0.5f,0.5f);
     glUniform1f(m_shaderProgram->getUniformLoc("shininess"),10.f);
 

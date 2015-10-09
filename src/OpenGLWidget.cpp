@@ -82,9 +82,9 @@ void OpenGLWidget::initializeGL(){
     //Initialize my texture library
     GLTextureLib::getInstance();
 
-    m_clothSim = new ClothSim(10,10);
+    m_clothSim = new ClothSim(1000,1000);
     m_clothSim->setTexture("textures/Luke.bmp");
-    m_clothSim->setRestLength(1.25);
+    m_clothSim->setRestLength(1);
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
 
     m_currentTime = m_currentTime.currentTime();
