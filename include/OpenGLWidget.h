@@ -94,7 +94,7 @@ public slots:
     /// @brief changes rest length of simulation
     /// @param _len - desired rest length
     //----------------------------------------------------------------------------------------------------------------------
-    inline void setRestLen(float _len){m_clothSim->setRestLength(_len);}
+    inline void setRestLen(double _len){m_clothSim->setRestLength((float)_len);}
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief toggles update of simulation
     //----------------------------------------------------------------------------------------------------------------------

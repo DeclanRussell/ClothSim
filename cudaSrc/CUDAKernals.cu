@@ -49,7 +49,7 @@ __global__ void clothSolverKernal(float3* _posBuffer, particles* _partBuffer, fl
         //printf("Delta %f,%f,%f \n",delta.x,delta.y,delta.z);
     }
     //printf("Pos %f,%f,%f \n",pos.x,pos.y,pos.z);
-    _posBuffer[part.idx] = pos;
+   _posBuffer[part.idx] = pos;
 
 }
 //----------------------------------------------------------------------------------------------------------------------

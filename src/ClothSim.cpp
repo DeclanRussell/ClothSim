@@ -294,11 +294,9 @@ void ClothSim::createPlane(int _width, int _height)
                     (x==0)? p.nIdx[0] = p.idx + 1 : p.nIdx[0] = p.idx - 1;
                     p.nIdx[1] = p.idx + m_width;
                     p.nIdx[2] = p.idx - m_width;
-                    partData3.push_back(p);
                 }
+                partData3.push_back(p);
                 //std::cout<<p.nIdx[0]<<","<<p.nIdx[1]<<","<<p.nIdx[2]<<std::endl;
-
-
             }
         }
     }
