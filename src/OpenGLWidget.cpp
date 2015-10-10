@@ -6,6 +6,7 @@
 #include <GLTextureLib.h>
 
 #define DtoR 0.0174532925f
+#define GLM_FORCE_CUDA
 
 //----------------------------------------------------------------------------------------------------------------------
 /// @brief the increment for x/y translation with mouse movement
@@ -82,7 +83,7 @@ void OpenGLWidget::initializeGL(){
     //Initialize my texture library
     GLTextureLib::getInstance();
 
-    m_clothSim = new ClothSim(1000,1000);
+    m_clothSim = new ClothSim(10,10);
     m_clothSim->setTexture("textures/Luke.bmp");
     m_clothSim->setRestLength(1);
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
@@ -161,7 +162,18 @@ void OpenGLWidget::keyPressEvent(QKeyEvent *_event){
     {
     case(Qt::Key_E) :m_clothSim->update(0.0001); break;
     case(Qt::Key_W) :glPolygonMode(GL_FRONT_AND_BACK,GL_LINE); break;
-    case(Qt::Key_S) : glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); break;
+    case(Qt::Key_S) :glPolygonMode(GL_FRONT_AND_BACK,GL_FILL); break;
+    case(Qt::Key_1) :m_clothSim->usePhongShader(); break;
+    case(Qt::Key_2) :m_clothSim->useClothShader(); break;
+    case(Qt::Key_Control) : m_fixPoints = true; break;
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+void OpenGLWidget::keyReleaseEvent(QKeyEvent *_event)
+{
+    switch(_event->key())
+    {
+        case(Qt::Key_Control) : m_fixPoints = false; break;
     }
 }
 //----------------------------------------------------------------------------------------------------------------------
@@ -191,6 +203,19 @@ void OpenGLWidget::mouseMoveEvent (QMouseEvent * _event)
         m_modelPos.y -= INCREMENT * diffY;
         updateGL();
     }
+    else if(m_fixPoints && _event->buttons() ==Qt::LeftButton){
+        glm::mat4 temp;
+        glm::vec3 x = glm::unProject(glm::vec3(_event->x(),_event->y(),m_cam->getFar()),temp,m_cam->getProjectionMatrix(),glm::vec4(0,0,width(),height()));
+        glm::vec3 ray = x - m_cam->getPos();
+        glm::mat4 rotx, roty;
+        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+        glm::mat4 M = rotx*roty;
+        M[3][0] = m_modelPos.x;
+        M[3][1] = m_modelPos.y;
+        M[3][2] = m_modelPos.z;
+        m_clothSim->fixNewPoints(m_cam->getPos(),ray,M);
+    }
 }
 //----------------------------------------------------------------------------------------------------------------------
 void OpenGLWidget::mousePressEvent ( QMouseEvent * _event)
@@ -208,6 +233,19 @@ void OpenGLWidget::mousePressEvent ( QMouseEvent * _event)
         m_origXPos = _event->x();
         m_origYPos = _event->y();
         m_translate=true;
+    }
+    else if(m_fixPoints && _event->buttons() ==Qt::LeftButton){
+        glm::mat4 temp;
+        glm::vec3 x = glm::unProject(glm::vec3(_event->x(),_event->y(),m_cam->getFar()),temp,m_cam->getProjectionMatrix(),glm::vec4(0,0,width(),height()));
+        glm::vec3 ray = x - m_cam->getPos();
+        glm::mat4 rotx, roty;
+        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+        glm::mat4 M = rotx*roty;
+        M[3][0] = m_modelPos.x;
+        M[3][1] = m_modelPos.y;
+        M[3][2] = m_modelPos.z;
+        m_clothSim->fixNewPoints(m_cam->getPos(),ray,M);
     }
 }
 //----------------------------------------------------------------------------------------------------------------------

@@ -12,7 +12,7 @@
 
 
 //----------------------------------------------------------------------------------------------------------------------
-ClothSim::ClothSim(int _width, int _height) : m_restLength(1), m_mass(1)
+ClothSim::ClothSim(int _width, int _height) : m_restLength(1), m_mass(1), m_fixNewPoints(false)
 {
     //Lets test some cuda stuff
     int count;
@@ -38,6 +38,9 @@ ClothSim::ClothSim(int _width, int _height) : m_restLength(1), m_mass(1)
     //create our plane
     createPlane(_width,_height);
     createPhongShader();
+    createClothShader();
+    usePhongShader();
+    //useClothShader();
 }
 //----------------------------------------------------------------------------------------------------------------------
 ClothSim::~ClothSim()
@@ -56,6 +59,7 @@ ClothSim::~ClothSim()
         checkCudaErrors(cudaFree(d_constraintBuffers[i].ptr));
     checkCudaErrors(cudaFree(d_oldParticlePos));
     checkCudaErrors(cudaFree(d_fixedPartBuffer));
+    checkCudaErrors(cudaFree(d_intersectIds));
     // Delete our CUDA streams as well
     checkCudaErrors(cudaStreamDestroy(m_cudaStream));
 }
@@ -63,7 +67,7 @@ ClothSim::~ClothSim()
 void ClothSim::draw(glm::mat4 _MV, glm::mat4 _MVP, glm::mat3 _normalMat)
 {
     //use or phong shader program
-    m_shaderProgram->use();
+    m_activeShaderProgram->use();
     //load in our matricies
     glUniformMatrix4fv(m_MVLoc, 1, GL_FALSE, glm::value_ptr(_MV));
     glUniformMatrix4fv(m_MVPLoc, 1, GL_FALSE, glm::value_ptr(_MVP));
@@ -107,6 +111,16 @@ void ClothSim::update(float _timeStep)
     //make sure all our threads are done
     cudaThreadSynchronize();
 
+    //See if we wish to add more fixed points
+    if(m_fixNewPoints)
+    {
+        //testIntersect(m_cudaStream,d_posPtr,d_intersectIds,m_rayOrigin,m_rayDir,m_vertRadius,m_modelMatrix,m_numParticles,m_threadsPerBlock);
+
+        m_fixNewPoints = false;
+        int temp = -1;
+        cudaMemcpy(d_intersectIds,&temp, sizeof(int),cudaMemcpyHostToDevice);
+    }
+
     //unmap our buffer pointer and set it free into the wild
     cudaGraphicsUnmapResources(1,&m_resourceVerts);
 }
@@ -124,9 +138,12 @@ void ClothSim::setTexture(QString _loc)
     GLTexture *GLtex = texLib->addTexture("clothTexture",GL_TEXTURE_2D,0,GL_RGBA,tex.width(),tex.height(),0,GL_RGBA,GL_UNSIGNED_BYTE,tex.bits());
     GLtex->setTexParamiteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     GLtex->setTexParamiteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    m_shaderProgram->use();
+    m_phongShaderProgram->use();
     GLtex->bind(0);
-    glUniform1i(m_shaderProgram->getUniformLoc("tex"),0);
+    glUniform1i(m_phongShaderProgram->getUniformLoc("tex"),0);
+    m_clothShaderProgram->use();
+    GLtex->bind(0);
+    glUniform1i(m_clothShaderProgram->getUniformLoc("tex"),0);
 
 }
 //----------------------------------------------------------------------------------------------------------------------
@@ -166,6 +183,34 @@ void ClothSim::reset()
 
 }
 //----------------------------------------------------------------------------------------------------------------------
+void ClothSim::usePhongShader()
+{
+    m_phongShaderProgram->use();
+    //get the locations of our uniforms that we frequently use in our shader
+    m_MVLoc = m_phongShaderProgram->getUniformLoc("modelViewMatrix");
+    m_MVPLoc = m_phongShaderProgram->getUniformLoc("modelViewProjectionMatrix");
+    m_normMatLoc = m_phongShaderProgram->getUniformLoc("normalMatrix");
+    m_activeShaderProgram = m_phongShaderProgram;
+}
+//----------------------------------------------------------------------------------------------------------------------
+void ClothSim::useClothShader()
+{
+    m_clothShaderProgram->use();
+    //get the locations of our uniforms that we frequently use in our shader
+    m_MVLoc = m_clothShaderProgram->getUniformLoc("MV");
+    m_MVPLoc = m_clothShaderProgram->getUniformLoc("MVP");
+    m_normMatLoc = m_clothShaderProgram->getUniformLoc("normalMatrix");
+    m_activeShaderProgram = m_clothShaderProgram;
+}
+//----------------------------------------------------------------------------------------------------------------------
+void ClothSim::fixNewPoints(glm::vec3 _from, glm::vec3 _ray, glm::mat4 _modelMatrix)
+{
+    m_fixNewPoints = true;
+    m_rayOrigin = _from;
+    m_rayDir = _ray;
+    m_modelMatrix = _modelMatrix;
+}
+//----------------------------------------------------------------------------------------------------------------------
 void ClothSim::createPlane(int _width, int _height)
 {
     std::vector<float3> vertices;
@@ -179,6 +224,7 @@ void ClothSim::createPlane(int _width, int _height)
     float wStep=1.f/(float)m_width;
     float hStep=1.f/(float)m_height;
     m_restLength = 10.f/((m_width+m_height)/2);
+    m_vertRadius = 5.f/((m_width+m_height)/2);
     std::cout<<"rest Length "<<m_restLength<<std::endl;
     // now we assume that the grid is centered at 0,0,0 so we make
     // it flow from -w/2 -d/2
@@ -250,7 +296,8 @@ void ClothSim::createPlane(int _width, int _height)
 
     // create some pretty standard normals
     std::vector<float3> norms;
-    for (int i=0; i<m_numVerts; i++){
+    for (int i=0; i<m_numVerts; i++)
+    {
         norms.push_back(make_float3(0.0, 0.0, -1.0));
     }
 
@@ -269,6 +316,19 @@ void ClothSim::createPlane(int _width, int _height)
     glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2)*texCoords.size(), &texCoords[0], GL_STATIC_DRAW);
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+
+    // OpenGL buffer to tell us if the points are fixed or not
+    std::vector<int> fixedVerts;
+    for (unsigned int i=0; i<vertices.size(); i++)
+    {
+        fixedVerts.push_back(0);
+    }
+    glGenBuffers(1, &m_VBOFixedVerts);
+    glBindBuffer(GL_ARRAY_BUFFER, m_VBOFixedVerts);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(int)*fixedVerts.size(), &fixedVerts[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 1, GL_INT, GL_FALSE, 0, 0);
 
     // Set our indecies for our plane
     glGenBuffers(1, &m_VBOidc);
@@ -344,6 +404,13 @@ void ClothSim::createPlane(int _width, int _height)
     // the top 2 corners will be addd to our fixed point array so the cloth is attached to something
     fixedParticles.push_back(0);
     fixedParticles.push_back(m_width*(m_height-1));
+    glBindBuffer(GL_ARRAY_BUFFER, m_VBOFixedVerts);
+    void* data = glMapBuffer(GL_ARRAY_BUFFER,GL_WRITE_ONLY);
+    int* ptr = (int*) data;
+    ptr[0] = 1;
+    ptr[m_width*(m_height-1)] = 1;
+    glUnmapBuffer(GL_ARRAY_BUFFER);
+
     m_numFixedParticles = 2;
 
     // Now lets load the particle information onto our device
@@ -385,6 +452,11 @@ void ClothSim::createPlane(int _width, int _height)
         std::cout<<d_constraintBuffers[i].numConsts<<std::endl;
     }
 
+    //Create a buffer to store intersected points Id's for our selection program
+    cudaMalloc(&d_intersectIds,sizeof(int));
+    int temp = -1;
+    cudaMemcpy(d_intersectIds,&temp, sizeof(int),cudaMemcpyHostToDevice);
+
     // Create our CUDA stream to run our kernals on. This helps with running kernals concurrently.
     // This is something you will not get taught by richard! Check them out at http://on-demand.gputechconf.com/gtc-express/2011/presentations/StreamsAndConcurrencyWebinar.pdf
     cudaStreamCreate(&m_cudaStream);
@@ -395,26 +467,52 @@ void ClothSim::createPlane(int _width, int _height)
 //----------------------------------------------------------------------------------------------------------------------
 void ClothSim::createPhongShader()
 {
-    m_shaderProgram = new ShaderProgram();
+    m_phongShaderProgram = new ShaderProgram();
     Shader vertShader("shaders/phongVert.glsl", GL_VERTEX_SHADER);
     Shader fragShader("shaders/phongFrag.glsl", GL_FRAGMENT_SHADER);
-    m_shaderProgram->attachShader(&vertShader);
-    m_shaderProgram->attachShader(&fragShader);
-    m_shaderProgram->bindFragDataLocation(0, "fragColour");
-    m_shaderProgram->link();
-    m_shaderProgram->use();
+    m_phongShaderProgram->attachShader(&vertShader);
+    m_phongShaderProgram->attachShader(&fragShader);
+    m_phongShaderProgram->bindFragDataLocation(0, "fragColour");
+    m_phongShaderProgram->link();
+    m_phongShaderProgram->use();
 
-    glUniform4f(m_shaderProgram->getUniformLoc("light.position"),1.f,1.f,3.f,1.f);
-    glUniform3f(m_shaderProgram->getUniformLoc("light.intensity"),.2f,.2f,.2f);
-    glUniform3f(m_shaderProgram->getUniformLoc("Kd"),0.7f,0.7f,0.7f);
-    glUniform3f(m_shaderProgram->getUniformLoc("Ka"),0.7f,0.7f,0.7f);
-    glUniform3f(m_shaderProgram->getUniformLoc("Ks"),0.5f,0.5f,0.5f);
-    glUniform1f(m_shaderProgram->getUniformLoc("shininess"),10.f);
+    glUniform4f(m_phongShaderProgram->getUniformLoc("light.position"),1.f,1.f,3.f,1.f);
+    glUniform3f(m_phongShaderProgram->getUniformLoc("light.intensity"),.2f,.2f,.2f);
+    glUniform3f(m_phongShaderProgram->getUniformLoc("Kd"),0.7f,0.7f,0.7f);
+    glUniform3f(m_phongShaderProgram->getUniformLoc("Ka"),0.7f,0.7f,0.7f);
+    glUniform3f(m_phongShaderProgram->getUniformLoc("Ks"),0.5f,0.5f,0.5f);
+    glUniform1f(m_phongShaderProgram->getUniformLoc("shininess"),10.f);
 
     //get the locations of our uniforms that we frequently use in our shader
-    m_MVLoc = m_shaderProgram->getUniformLoc("modelViewMatrix");
-    m_MVPLoc = m_shaderProgram->getUniformLoc("modelViewProjectionMatrix");
-    m_normMatLoc = m_shaderProgram->getUniformLoc("normalMatrix");
+    m_MVLoc = m_phongShaderProgram->getUniformLoc("modelViewMatrix");
+    m_MVPLoc = m_phongShaderProgram->getUniformLoc("modelViewProjectionMatrix");
+    m_normMatLoc = m_phongShaderProgram->getUniformLoc("normalMatrix");
 
+}
+//----------------------------------------------------------------------------------------------------------------------
+void ClothSim::createClothShader()
+{
+    m_clothShaderProgram = new ShaderProgram();
+    Shader vertShader("shaders/clothVert.glsl", GL_VERTEX_SHADER);
+    Shader geomShader("shaders/clothGeom.glsl", GL_GEOMETRY_SHADER);
+    Shader fragShader("shaders/clothFrag.glsl", GL_FRAGMENT_SHADER);
+    m_clothShaderProgram->attachShader(&vertShader);
+    m_clothShaderProgram->attachShader(&geomShader);
+    m_clothShaderProgram->attachShader(&fragShader);
+    m_clothShaderProgram->bindFragDataLocation(0, "fragColour");
+    m_clothShaderProgram->link();
+    m_clothShaderProgram->use();
+
+    glUniform4f(m_clothShaderProgram->getUniformLoc("light.position"),1.f,1.f,3.f,1.f);
+    glUniform3f(m_clothShaderProgram->getUniformLoc("light.intensity"),.2f,.2f,.2f);
+    glUniform3f(m_clothShaderProgram->getUniformLoc("Kd"),0.7f,0.7f,0.7f);
+    glUniform3f(m_clothShaderProgram->getUniformLoc("Ka"),0.7f,0.7f,0.7f);
+    glUniform3f(m_clothShaderProgram->getUniformLoc("Ks"),0.5f,0.5f,0.5f);
+    glUniform1f(m_clothShaderProgram->getUniformLoc("shininess"),10.f);
+
+    //get the locations of our uniforms that we frequently use in our shader
+    m_MVLoc = m_clothShaderProgram->getUniformLoc("MV");
+    m_MVPLoc = m_clothShaderProgram->getUniformLoc("MVP");
+    m_normMatLoc = m_clothShaderProgram->getUniformLoc("normalMatrix");
 }
 //----------------------------------------------------------------------------------------------------------------------

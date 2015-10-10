@@ -41,6 +41,7 @@ public:
    inline float getFar(){return m_far;}
    inline float getAspect(){return m_aspect;}
    inline float getFOV(){return m_fov;}
+   inline glm::vec3 getPos(){return m_position;}
 
 
 private:

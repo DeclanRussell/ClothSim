@@ -75,7 +75,28 @@ __global__ void resetConstPartKernal(float3 *_posBuffer, float3 *_oldPosBuffer, 
         _posBuffer[partIdx] = _oldPosBuffer[partIdx];
     }
 }
+//----------------------------------------------------------------------------------------------------------------------
+/// @brief kernal to test intersection of ray and particles
+//----------------------------------------------------------------------------------------------------------------------
+__global__ void testIntersectKernal(float3 *_posBuffer, int *_idBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _modelMatrix, int _numParticles)
+{
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(idx<_numParticles)
+    {
+        float3 partPos = _posBuffer[idx];
 
+        Eigen::Vector4f pPos4 = Eigen::Vector4f(partPos.x,partPos.y,partPos.z,1.0);
+        pPos4 = _modelMatrix*pPos4;
+        Eigen::Vector3f pPos3 = Eigen::Vector3f(pPos4[0],pPos4[1],pPos4[2]);
+
+        float b = _ray.dot(_from-pPos3);
+        float c = (_from-pPos3).dot(_from-pPos3) - (_radius*_radius);
+        if(b*b-c>=0)
+        {
+            printf("hit vert %d",idx);
+        }
+    }
+}
 //----------------------------------------------------------------------------------------------------------------------
 void clothVerletIntegration(cudaStream_t _stream, float3 *_posBuffer, float3 *_oldPosBuffer, int _numParticles, float _mass, float _timeStep, int _maxNumThreads)
 {
@@ -119,4 +140,18 @@ void resetFixedParticles(cudaStream_t _stream, float3 *_posBuffer, float3 *_oldP
         resetConstPartKernal<<<1,_numParticles,0,_stream>>>(_posBuffer,_oldPosBuffer,_fixedParticles,_numParticles);
     }
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+void testIntersect(cudaStream_t _stream, float3 *_posBuffer, int *_idBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _modelMatrix, int _numParticles, int _maxNumThreads)
+{
+    if(_numParticles>_maxNumThreads)
+    {
+        //calculate how many blocks we want
+        int blocks = ceil(_numParticles/_maxNumThreads)+1;
+        testIntersectKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer, _idBuffer, _from, _ray, _radius, _modelMatrix, _numParticles);
+    }
+    else
+    {
+        testIntersectKernal<<<1,_numParticles,0,_stream>>>(_posBuffer, _idBuffer, _from, _ray, _radius, _modelMatrix, _numParticles);
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
