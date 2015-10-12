@@ -12,7 +12,7 @@
 
 
 //----------------------------------------------------------------------------------------------------------------------
-ClothSim::ClothSim(int _width, int _height) : m_restLength(1), m_mass(1), m_fixNewPoints(false)
+ClothSim::ClothSim(int _width, int _height) : m_restLength(1), m_mass(1)
 {
     //Lets test some cuda stuff
     int count;
@@ -48,18 +48,18 @@ ClothSim::~ClothSim()
     // Make sure we remember to unregister our cuda resource
     checkCudaErrors(cudaGraphicsUnregisterResource(m_resourceVerts));
     checkCudaErrors(cudaGraphicsUnregisterResource(m_resourceNorms));
+    checkCudaErrors(cudaGraphicsUnregisterResource(m_resourceFixedParts));
     // Delete our OpenGL buffers and arrays
     glDeleteBuffers(1,&m_VBOidc);
     glDeleteBuffers(1,&m_VBOverts);
     glDeleteBuffers(1,&m_VBOnorms);
     glDeleteBuffers(1,&m_VBOtexCoords);
+    glDeleteBuffers(1,&m_VBOFixedVerts);
     glDeleteVertexArrays(1,&m_VAO);
     // Delete our device pointers
     for(unsigned int i=0; i<d_constraintBuffers.size(); i++)
         checkCudaErrors(cudaFree(d_constraintBuffers[i].ptr));
     checkCudaErrors(cudaFree(d_oldParticlePos));
-    checkCudaErrors(cudaFree(d_fixedPartBuffer));
-    checkCudaErrors(cudaFree(d_intersectIds));
     // Delete our CUDA streams as well
     checkCudaErrors(cudaStreamDestroy(m_cudaStream));
 }
@@ -83,7 +83,7 @@ void ClothSim::draw(glm::mat4 _MV, glm::mat4 _MVP, glm::mat3 _normalMat)
 //----------------------------------------------------------------------------------------------------------------------
 void ClothSim::update(float _timeStep)
 {
-    //map our buffer pointer
+    //map our buffer pointers
     float3* d_posPtr;
     size_t d_posSize;
     cudaGraphicsMapResources(1,&m_resourceVerts);
@@ -103,26 +103,23 @@ void ClothSim::update(float _timeStep)
 
         //make sure all our threads are done
         cudaThreadSynchronize();
+        //std::cout<<std::endl;
     }
 
+    int* d_fixPartPtr;
+    size_t d_fixPartSize;
+    cudaGraphicsMapResources(1,&m_resourceFixedParts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_fixPartPtr,&d_fixPartSize,m_resourceFixedParts);
+
     //Reset our constrained particles
-    resetFixedParticles(m_cudaStream,d_posPtr,d_oldParticlePos,d_fixedPartBuffer,m_numFixedParticles,m_threadsPerBlock);
+    resetFixedParticles(m_cudaStream,d_posPtr,d_oldParticlePos,d_fixPartPtr,m_numParticles,m_threadsPerBlock);
 
     //make sure all our threads are done
     cudaThreadSynchronize();
 
-    //See if we wish to add more fixed points
-    if(m_fixNewPoints)
-    {
-        //testIntersect(m_cudaStream,d_posPtr,d_intersectIds,m_rayOrigin,m_rayDir,m_vertRadius,m_modelMatrix,m_numParticles,m_threadsPerBlock);
-
-        m_fixNewPoints = false;
-        int temp = -1;
-        cudaMemcpy(d_intersectIds,&temp, sizeof(int),cudaMemcpyHostToDevice);
-    }
-
     //unmap our buffer pointer and set it free into the wild
     cudaGraphicsUnmapResources(1,&m_resourceVerts);
+    cudaGraphicsUnmapResources(1,&m_resourceFixedParts);
 }
 //----------------------------------------------------------------------------------------------------------------------
 void ClothSim::setTexture(QString _loc)
@@ -203,12 +200,65 @@ void ClothSim::useClothShader()
     m_activeShaderProgram = m_clothShaderProgram;
 }
 //----------------------------------------------------------------------------------------------------------------------
-void ClothSim::fixNewPoints(glm::vec3 _from, glm::vec3 _ray, glm::mat4 _modelMatrix)
+void ClothSim::fixNewPoints(glm::vec3 _from, glm::vec3 _ray, glm::mat4 _viewMatrix)
 {
-    m_fixNewPoints = true;
-    m_rayOrigin = _from;
-    m_rayDir = _ray;
-    m_modelMatrix = _modelMatrix;
+
+    Eigen::Vector3f from(_from.x,_from.y,_from.z);
+    Eigen::Vector3f ray(_ray.x,_ray.y,_ray.z);
+    Eigen::Matrix4f egnM;
+    egnM << _viewMatrix[0][0],_viewMatrix[1][0],_viewMatrix[2][0],_viewMatrix[3][0],
+            _viewMatrix[0][1],_viewMatrix[1][1],_viewMatrix[2][1],_viewMatrix[3][1],
+            _viewMatrix[0][2],_viewMatrix[1][2],_viewMatrix[2][2],_viewMatrix[3][2],
+            _viewMatrix[0][3],_viewMatrix[1][3],_viewMatrix[2][3],_viewMatrix[3][3];
+
+    //map our buffer pointer
+    float3* d_posPtr;
+    int* d_fixPartPtr;
+    size_t d_posSize,d_fixPartSize;
+    cudaGraphicsMapResources(1,&m_resourceVerts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_posPtr,&d_posSize,m_resourceVerts);
+    cudaGraphicsMapResources(1,&m_resourceFixedParts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_fixPartPtr,&d_fixPartSize,m_resourceFixedParts);
+
+    //test our intersection
+    fixParticles(m_cudaStream,d_posPtr,d_fixPartPtr,from,ray,m_vertRadius,egnM,m_numParticles,m_threadsPerBlock);
+
+    //make sure all our threads are done
+    cudaThreadSynchronize();
+
+    //unmap our buffer pointer and set it free into the wild
+    cudaGraphicsUnmapResources(1,&m_resourceVerts);
+    cudaGraphicsUnmapResources(1,&m_resourceFixedParts);
+}
+//----------------------------------------------------------------------------------------------------------------------
+void ClothSim::unFixPoints(glm::vec3 _from, glm::vec3 _ray, glm::mat4 _viewMatrix)
+{
+    Eigen::Vector3f from(_from.x,_from.y,_from.z);
+    Eigen::Vector3f ray(_ray.x,_ray.y,_ray.z);
+    Eigen::Matrix4f egnM;
+    egnM << _viewMatrix[0][0],_viewMatrix[1][0],_viewMatrix[2][0],_viewMatrix[3][0],
+            _viewMatrix[0][1],_viewMatrix[1][1],_viewMatrix[2][1],_viewMatrix[3][1],
+            _viewMatrix[0][2],_viewMatrix[1][2],_viewMatrix[2][2],_viewMatrix[3][2],
+            _viewMatrix[0][3],_viewMatrix[1][3],_viewMatrix[2][3],_viewMatrix[3][3];
+
+    //map our buffer pointer
+    float3* d_posPtr;
+    int* d_fixPartPtr;
+    size_t d_posSize,d_fixPartSize;
+    cudaGraphicsMapResources(1,&m_resourceVerts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_posPtr,&d_posSize,m_resourceVerts);
+    cudaGraphicsMapResources(1,&m_resourceFixedParts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_fixPartPtr,&d_fixPartSize,m_resourceFixedParts);
+
+    //test our intersection
+    unFixParticles(m_cudaStream,d_posPtr,d_fixPartPtr,from,ray,m_vertRadius,egnM,m_numParticles,m_threadsPerBlock);
+
+    //make sure all our threads are done
+    cudaThreadSynchronize();
+
+    //unmap our buffer pointer and set it free into the wild
+    cudaGraphicsUnmapResources(1,&m_resourceVerts);
+    cudaGraphicsUnmapResources(1,&m_resourceFixedParts);
 }
 //----------------------------------------------------------------------------------------------------------------------
 void ClothSim::createPlane(int _width, int _height)
@@ -330,6 +380,9 @@ void ClothSim::createPlane(int _width, int _height)
     glEnableVertexAttribArray(3);
     glVertexAttribPointer(3, 1, GL_INT, GL_FALSE, 0, 0);
 
+    // create our cuda graphics resource for our fixed verts used for our OpenGL interop
+    checkCudaErrors(cudaGraphicsGLRegisterBuffer(&m_resourceFixedParts, m_VBOFixedVerts, cudaGraphicsRegisterFlagsWriteDiscard));
+
     // Set our indecies for our plane
     glGenBuffers(1, &m_VBOidc);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_VBOidc);
@@ -400,23 +453,13 @@ void ClothSim::createPlane(int _width, int _height)
         switch2=!switch2;
     }
 
-    std::vector<int> fixedParticles;
     // the top 2 corners will be addd to our fixed point array so the cloth is attached to something
-    fixedParticles.push_back(0);
-    fixedParticles.push_back(m_width*(m_height-1));
     glBindBuffer(GL_ARRAY_BUFFER, m_VBOFixedVerts);
     void* data = glMapBuffer(GL_ARRAY_BUFFER,GL_WRITE_ONLY);
     int* ptr = (int*) data;
     ptr[0] = 1;
     ptr[m_width*(m_height-1)] = 1;
     glUnmapBuffer(GL_ARRAY_BUFFER);
-
-    m_numFixedParticles = 2;
-
-    // Now lets load the particle information onto our device
-    // Fixed point indecies
-    cudaMalloc(&d_fixedPartBuffer,fixedParticles.size()*sizeof(int));
-    cudaMemcpy(d_fixedPartBuffer,&fixedParticles[0],fixedParticles.size()*sizeof(int),cudaMemcpyHostToDevice);
 
     // Our old positions buffer
     cudaMalloc(&d_oldParticlePos,vertices.size()*sizeof(float3));
@@ -448,14 +491,9 @@ void ClothSim::createPlane(int _width, int _height)
     cudaMemcpy(d_constraintBuffers[5].ptr,&constraintData6[0],constraintData6.size()*sizeof(constraints),cudaMemcpyHostToDevice);
     d_constraintBuffers[5].numConsts = constraintData6.size();
 
-    for(int i=0;i<d_constraintBuffers.size();i++){
+    for(unsigned int i=0;i<d_constraintBuffers.size();i++){
         std::cout<<d_constraintBuffers[i].numConsts<<std::endl;
     }
-
-    //Create a buffer to store intersected points Id's for our selection program
-    cudaMalloc(&d_intersectIds,sizeof(int));
-    int temp = -1;
-    cudaMemcpy(d_intersectIds,&temp, sizeof(int),cudaMemcpyHostToDevice);
 
     // Create our CUDA stream to run our kernals on. This helps with running kernals concurrently.
     // This is something you will not get taught by richard! Check them out at http://on-demand.gputechconf.com/gtc-express/2011/presentations/StreamsAndConcurrencyWebinar.pdf

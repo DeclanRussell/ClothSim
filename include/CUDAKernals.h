@@ -53,19 +53,34 @@ void clothConstraintSolver(cudaStream_t _stream, float3 * _posBuffer, constraint
 //----------------------------------------------------------------------------------------------------------------------
 void resetFixedParticles(cudaStream_t _stream, float3 * _posBuffer, float3* _oldPosBuffer, int* _fixedParticles,int _numParticles, int _maxNumThreads);
 //----------------------------------------------------------------------------------------------------------------------
-/// @brief tests intersection with ray and points in our mesh
+/// @brief tests intersection with ray and points in our mesh and fixes new verticies
 /// @param _stream - the cuda stream to run our kernal
 /// @param _posBuffer - buffer of our verticies positions
 /// @param _idBuffer - buffer to store id of intesected vertex
 /// @param _from - position our ray is from
 /// @param _ray - direction of the ray
 /// @param _raidus - radius of points to intersect
-/// @param _modelMatrix - model matrix of scene
+/// @param _MV - view matrix of scene
 /// @param _numParticles - the number of particles to solve for
 /// @param _maxNumThreads - the maximum number of threads our device has per block
 //----------------------------------------------------------------------------------------------------------------------
-void testIntersect(cudaStream_t _stream, float3 * _posBuffer, int *_idBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _modelMatrix, int _numParticles, int _maxNumThreads);
+void fixParticles(cudaStream_t _stream, float3 * _posBuffer, int *_idBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles, int _maxNumThreads);
 //----------------------------------------------------------------------------------------------------------------------
+/// @brief tests intersection with ray and points in our mesh and unfixes verticies
+/// @param _stream - the cuda stream to run our kernal
+/// @param _posBuffer - buffer of our verticies positions
+/// @param _idBuffer - buffer to store id of intesected vertex
+/// @param _from - position our ray is from
+/// @param _ray - direction of the ray
+/// @param _raidus - radius of points to intersect
+/// @param _MV - view matrix of scene
+/// @param _numParticles - the number of particles to solve for
+/// @param _maxNumThreads - the maximum number of threads our device has per block
+//----------------------------------------------------------------------------------------------------------------------
+void unFixParticles(cudaStream_t _stream, float3 * _posBuffer, int *_idBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles, int _maxNumThreads);
+//----------------------------------------------------------------------------------------------------------------------
+
+
 
 
 
