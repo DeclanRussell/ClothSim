@@ -89,7 +89,8 @@ void OpenGLWidget::initializeGL(){
 
     m_clothSim = new ClothSim(100,100);
     //m_clothSim->setTexture("textures/Luke.bmp");
-    m_clothSim->setTexture("textures/bareHilare.jpg");
+    m_clothSim->setTexture("textures/CerbDOFDoubleHD.png");
+    //m_clothSim->setTexture("textures/bareHilare.jpg");
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
 
     m_currentTime = m_currentTime.currentTime();
