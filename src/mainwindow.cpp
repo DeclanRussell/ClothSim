@@ -32,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     QDoubleSpinBox *restSpn = new QDoubleSpinBox(setGrb);
     setLayout->addWidget(restSpn,0,1,1,1);
     restSpn->setDecimals(5);
+    restSpn->setValue(0.1);
     connect(restSpn,SIGNAL(valueChanged(double)),m_openGLWidget,SLOT(setRestLen(double)));
 
     //Group box for our general UI buttons

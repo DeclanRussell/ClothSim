@@ -43,7 +43,7 @@ __global__ void constraintSolverKernal(float3* _posBuffer, constraints* _constra
 
         // Satisfy the constrainsts
         float3 delta;
-        float deltaLength,diff;
+        float diff;
 
         delta = partB - partA;
         //deltaLength = length(delta);
@@ -135,6 +135,47 @@ __global__ void unFixParticlesKernal(float3 *_posBuffer, int *_fixVertsBuffer, E
     }
 }
 //----------------------------------------------------------------------------------------------------------------------
+/// @brief kernal to fix and set the currently selected move vertex
+//----------------------------------------------------------------------------------------------------------------------
+__global__ void setMoveVertexKernal(float3 *_posBuffer, int *_fixVertsBuffer, int *_moveVertex, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles)
+{
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if(idx<_numParticles)
+    {
+        bool selected = testIntersection(idx,_posBuffer,_from,_ray,_radius,_V);
+        if(selected)
+        {
+//            printf("idx %d\n",idx);
+            _fixVertsBuffer[idx] = 1;
+            _moveVertex[0] = idx;
+        }
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+/// @brief unselectes the currently selected move vertex
+//----------------------------------------------------------------------------------------------------------------------
+__global__ void unselectMoveVertexKernal( int *_fixVertsBuffer, int *_moveVertex)
+{
+    int idx = _moveVertex[0];
+    if(idx!=-1)
+    {
+        _fixVertsBuffer[idx] = 0;
+        _moveVertex[0] = -1;
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+/// @brief moves the currently selected move vertex
+//----------------------------------------------------------------------------------------------------------------------
+__global__ void moveVertexKernal(float3 *_posBuffer, int *_moveVertex, float3 _dir)
+{
+    int idx = _moveVertex[0];
+    if(idx!=-1)
+    {
+        _posBuffer[idx]+=_dir;
+    }
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 void clothVerletIntegration(cudaStream_t _stream, float3 *_posBuffer, float3 *_oldPosBuffer, int _numParticles, float _mass, float _timeStep, int _maxNumThreads)
 {
     if(_numParticles>_maxNumThreads)
@@ -178,30 +219,55 @@ void resetFixedParticles(cudaStream_t _stream, float3 *_posBuffer, float3 *_oldP
     }
 }
 //----------------------------------------------------------------------------------------------------------------------
-void fixParticles(cudaStream_t _stream, float3 *_posBuffer, int *_idBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles, int _maxNumThreads)
+void fixParticles(cudaStream_t _stream, float3 *_posBuffer, int *_fixedBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles, int _maxNumThreads)
 {
     if(_numParticles>_maxNumThreads)
     {
         //calculate how many blocks we want
         int blocks = ceil(_numParticles/_maxNumThreads)+1;
-        fixParticlesKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer, _idBuffer, _from, _ray, _radius, _V, _numParticles);
+        fixParticlesKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer, _fixedBuffer, _from, _ray, _radius, _V, _numParticles);
     }
     else
     {
-        fixParticlesKernal<<<1,_numParticles,0,_stream>>>(_posBuffer, _idBuffer, _from, _ray, _radius, _V, _numParticles);
+        fixParticlesKernal<<<1,_numParticles,0,_stream>>>(_posBuffer, _fixedBuffer, _from, _ray, _radius, _V, _numParticles);
     }
 }
 //----------------------------------------------------------------------------------------------------------------------
-void unFixParticles(cudaStream_t _stream, float3 * _posBuffer, int *_idBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles, int _maxNumThreads)
+void unFixParticles(cudaStream_t _stream, float3 * _posBuffer, int *_fixedBuffer, Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles, int _maxNumThreads)
 {
     if(_numParticles>_maxNumThreads)
     {
         //calculate how many blocks we want
         int blocks = ceil(_numParticles/_maxNumThreads)+1;
-        unFixParticlesKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer, _idBuffer, _from, _ray, _radius, _V, _numParticles);
+        unFixParticlesKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer, _fixedBuffer, _from, _ray, _radius, _V, _numParticles);
     }
     else
     {
-        unFixParticlesKernal<<<1,_numParticles,0,_stream>>>(_posBuffer, _idBuffer, _from, _ray, _radius, _V, _numParticles);
+        unFixParticlesKernal<<<1,_numParticles,0,_stream>>>(_posBuffer, _fixedBuffer, _from, _ray, _radius, _V, _numParticles);
     }
 }
+//----------------------------------------------------------------------------------------------------------------------
+void setMoveParticles(cudaStream_t _stream, float3 * _posBuffer, int *_fixedBuffer,int *_moveVertex ,Eigen::Vector3f _from, Eigen::Vector3f _ray, float _radius, Eigen::Matrix4f _V, int _numParticles, int _maxNumThreads)
+{
+    if(_numParticles>_maxNumThreads)
+    {
+        //calculate how many blocks we want
+        int blocks = ceil(_numParticles/_maxNumThreads)+1;
+        setMoveVertexKernal<<<blocks,_maxNumThreads,0,_stream>>>(_posBuffer, _fixedBuffer, _moveVertex, _from, _ray, _radius, _V, _numParticles);
+    }
+    else
+    {
+        setMoveVertexKernal<<<1,_numParticles,0,_stream>>>(_posBuffer, _fixedBuffer, _moveVertex, _from, _ray, _radius, _V, _numParticles);
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+void unSelectMoveParticle(cudaStream_t _stream, int *_fixedBuffer,int *_moveVertex)
+{
+    unselectMoveVertexKernal<<<1,1,0,_stream>>>(_fixedBuffer,_moveVertex);
+}
+//----------------------------------------------------------------------------------------------------------------------
+void moveSelectedParticle(cudaStream_t _stream,float3 *_posBuffer, int *_moveVertex, float3 _dir)
+{
+    moveVertexKernal<<<1,1,0,_stream>>>(_posBuffer,_moveVertex,_dir);
+}
+//----------------------------------------------------------------------------------------------------------------------

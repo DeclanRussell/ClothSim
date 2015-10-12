@@ -26,6 +26,7 @@ OpenGLWidget::OpenGLWidget(const QGLFormat _format, QWidget *_parent) : QGLWidge
     m_transformScene = false;
     m_fixPoints = false;
     m_unFixPoints = false;
+    m_moveVertex = false;
     // mouse rotation values set to 0
     m_spinXFace=0;
     m_spinYFace=0;
@@ -86,10 +87,9 @@ void OpenGLWidget::initializeGL(){
     //Initialize my texture library
     GLTextureLib::getInstance();
 
-    m_clothSim = new ClothSim(10,10);
+    m_clothSim = new ClothSim(100,100);
     //m_clothSim->setTexture("textures/Luke.bmp");
     m_clothSim->setTexture("textures/bareHilare.jpg");
-    m_clothSim->setRestLength(1);
     glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
 
     m_currentTime = m_currentTime.currentTime();
@@ -217,9 +217,9 @@ void OpenGLWidget::mouseMoveEvent (QMouseEvent * _event)
         }
     }
     else if(m_fixPoints && _event->buttons() ==Qt::LeftButton){
-        glm::mat4 rotx, roty;
-        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
-        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+//        glm::mat4 rotx, roty;
+//        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+//        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
         glm::mat4 M;// = rotx*roty;
         M[3][0] = m_modelPos.x;
         M[3][1] = m_modelPos.y;
@@ -234,9 +234,9 @@ void OpenGLWidget::mouseMoveEvent (QMouseEvent * _event)
         m_clothSim->fixNewPoints(m_cam->getPos(),ray,m_cam->getViewMatrix());
     }
     else if(m_unFixPoints && _event->buttons() ==Qt::LeftButton){
-        glm::mat4 rotx, roty;
-        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
-        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+//        glm::mat4 rotx, roty;
+//        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+//        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
         glm::mat4 M;// = rotx*roty;
         M[3][0] = m_modelPos.x;
         M[3][1] = m_modelPos.y;
@@ -249,6 +249,17 @@ void OpenGLWidget::mouseMoveEvent (QMouseEvent * _event)
         glm::vec3 ray = x - m_cam->getPos();
         ray = glm::normalize(ray);
         m_clothSim->unFixPoints(m_cam->getPos(),ray,m_cam->getViewMatrix());
+    }
+    else if(m_moveVertex)
+    {
+        glm::mat4 M;
+        M[3][0] = m_modelPos.x;
+        M[3][1] = m_modelPos.y;
+        M[3][2] = m_modelPos.z;
+        glm::vec3 x = glm::unProject(glm::vec3(_event->x(),height()-_event->y(),m_moveVertexDepth),M,m_cam->getProjectionMatrix(),glm::vec4(0,0,width(),height()));
+        glm::vec3 dir = x - m_moveVertexStart;
+        m_moveVertexStart = x;
+        m_clothSim->moveSelectedVertex(dir);
     }
 }
 //----------------------------------------------------------------------------------------------------------------------
@@ -273,9 +284,9 @@ void OpenGLWidget::mousePressEvent ( QMouseEvent * _event)
     }
     else if(m_fixPoints && _event->buttons() ==Qt::LeftButton){
         std::cout<<"called"<<std::endl;
-        glm::mat4 rotx, roty;
-        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
-        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+//        glm::mat4 rotx, roty;
+//        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+//        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
         glm::mat4 M;// = rotx*roty;
         M[3][0] = m_modelPos.x;
         M[3][1] = m_modelPos.y;
@@ -291,9 +302,9 @@ void OpenGLWidget::mousePressEvent ( QMouseEvent * _event)
     }
     else if(m_unFixPoints && _event->buttons() ==Qt::LeftButton){
         std::cout<<"called"<<std::endl;
-        glm::mat4 rotx, roty;
-        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
-        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+//        glm::mat4 rotx, roty;
+//        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+//        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
         glm::mat4 M;// = rotx*roty;
         M[3][0] = m_modelPos.x;
         M[3][1] = m_modelPos.y;
@@ -307,6 +318,27 @@ void OpenGLWidget::mousePressEvent ( QMouseEvent * _event)
         ray = glm::normalize(ray);
         m_clothSim->unFixPoints(m_cam->getPos(),ray,m_cam->getViewMatrix());
     }
+    else if(_event->buttons() ==Qt::LeftButton)
+    {
+//        glm::mat4 rotx, roty;
+//        rotx = glm::rotate(rotx,m_spinXFace*DtoR,glm::vec3(1,0,0));
+//        roty = glm::rotate(roty,m_spinYFace*DtoR,glm::vec3(0,1,0));
+        glm::mat4 M;// = rotx*roty;
+        M[3][0] = m_modelPos.x;
+        M[3][1] = m_modelPos.y;
+        M[3][2] = m_modelPos.z;
+        float depth;
+        glReadPixels(_event->x(), height()-_event->y(), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+        std::cout<<"depth "<<depth<<std::endl;
+        glm::vec3 x = glm::unProject(glm::vec3(_event->x(),height()-_event->y(),depth),M,m_cam->getProjectionMatrix(),glm::vec4(0,0,width(),height()));
+        std::cout<<"x "<<x.x<<","<<x.y<<","<<x.z<<std::endl;
+        glm::vec3 ray = x - m_cam->getPos();
+        ray = glm::normalize(ray);
+        m_clothSim->setMoveVertex(m_cam->getPos(),ray,m_cam->getViewMatrix());
+        m_moveVertex = true;
+        m_moveVertexStart = x;
+        m_moveVertexDepth = depth;
+    }
 }
 //----------------------------------------------------------------------------------------------------------------------
 void OpenGLWidget::mouseReleaseEvent ( QMouseEvent * _event )
@@ -315,6 +347,8 @@ void OpenGLWidget::mouseReleaseEvent ( QMouseEvent * _event )
     // we then set Rotate to false
     if(_event->button() == Qt::LeftButton){
         m_rotate = false;
+        m_clothSim->removeMoveVertex();
+        m_moveVertex = false;
     }
     // right mouse translate mode
     if (_event->button() == Qt::RightButton)

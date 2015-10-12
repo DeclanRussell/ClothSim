@@ -261,6 +261,69 @@ void ClothSim::unFixPoints(glm::vec3 _from, glm::vec3 _ray, glm::mat4 _viewMatri
     cudaGraphicsUnmapResources(1,&m_resourceFixedParts);
 }
 //----------------------------------------------------------------------------------------------------------------------
+void ClothSim::setMoveVertex(glm::vec3 _from, glm::vec3 _ray, glm::mat4 _viewMatrix){
+    Eigen::Vector3f from(_from.x,_from.y,_from.z);
+    Eigen::Vector3f ray(_ray.x,_ray.y,_ray.z);
+    Eigen::Matrix4f egnM;
+    egnM << _viewMatrix[0][0],_viewMatrix[1][0],_viewMatrix[2][0],_viewMatrix[3][0],
+            _viewMatrix[0][1],_viewMatrix[1][1],_viewMatrix[2][1],_viewMatrix[3][1],
+            _viewMatrix[0][2],_viewMatrix[1][2],_viewMatrix[2][2],_viewMatrix[3][2],
+            _viewMatrix[0][3],_viewMatrix[1][3],_viewMatrix[2][3],_viewMatrix[3][3];
+
+    //map our buffer pointer
+    float3* d_posPtr;
+    int* d_fixPartPtr;
+    size_t d_posSize,d_fixPartSize;
+    cudaGraphicsMapResources(1,&m_resourceVerts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_posPtr,&d_posSize,m_resourceVerts);
+    cudaGraphicsMapResources(1,&m_resourceFixedParts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_fixPartPtr,&d_fixPartSize,m_resourceFixedParts);
+
+    //set the vertex we wish to move
+    setMoveParticles(m_cudaStream,d_posPtr,d_fixPartPtr,d_moveVertex,from,ray,m_vertRadius,egnM,m_numParticles,m_threadsPerBlock);
+
+    //make sure all our threads are done
+    cudaThreadSynchronize();
+
+    //unmap our buffer pointer and set it free into the wild
+    cudaGraphicsUnmapResources(1,&m_resourceVerts);
+    cudaGraphicsUnmapResources(1,&m_resourceFixedParts);
+}
+//----------------------------------------------------------------------------------------------------------------------
+void ClothSim::removeMoveVertex()
+{
+    int* d_fixPartPtr;
+    size_t d_fixPartSize;
+    cudaGraphicsMapResources(1,&m_resourceFixedParts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_fixPartPtr,&d_fixPartSize,m_resourceFixedParts);
+
+    //remove the vertex we wish to move
+    unSelectMoveParticle(m_cudaStream,d_fixPartPtr,d_moveVertex);
+
+    //make sure all our threads are done
+    cudaThreadSynchronize();
+
+    cudaGraphicsUnmapResources(1,&m_resourceFixedParts);
+}
+//----------------------------------------------------------------------------------------------------------------------
+void ClothSim::moveSelectedVertex(glm::vec3 _dir)
+{
+    //map our buffer pointer
+    float3* d_posPtr;
+    size_t d_posSize;
+    cudaGraphicsMapResources(1,&m_resourceVerts);
+    cudaGraphicsResourceGetMappedPointer((void**)&d_posPtr,&d_posSize,m_resourceVerts);
+
+    moveSelectedParticle(m_cudaStream,d_posPtr,d_moveVertex,make_float3(_dir.x,_dir.y,_dir.z));
+
+    //make sure all our threads are done
+    cudaThreadSynchronize();
+
+    //unmap our buffer pointer and set it free into the wild
+    cudaGraphicsUnmapResources(1,&m_resourceVerts);
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 void ClothSim::createPlane(int _width, int _height)
 {
     std::vector<float3> vertices;
@@ -391,6 +454,12 @@ void ClothSim::createPlane(int _width, int _height)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     // Now lets initialise our constraints data
+    // Now the issue with porting a cloth simulation to the GPU is when you relax the contraints you
+    // can get race conditions when writting the new positions of the vertecies. To solve this we
+    // organise the constraints into seperate buffers such that no constraint shares vertecies with
+    // other constraints then solving one at a time. I do this by having 2 buffers for every other horizontal
+    // constraint and 2 buffers for every other horizontal contraint. I had issues with the diagonal constraints
+    // but the result still looks ok therefore I have left them out.
     std::vector<constraints> constraintData1,constraintData2,constraintData3,constraintData4,constraintData5,constraintData6;
     bool switch1,switch2;
     switch1 = switch2 = true;
@@ -494,6 +563,11 @@ void ClothSim::createPlane(int _width, int _height)
     for(unsigned int i=0;i<d_constraintBuffers.size();i++){
         std::cout<<d_constraintBuffers[i].numConsts<<std::endl;
     }
+
+    // Create a buffer to store the index of the particle to move with mouse interaction
+    cudaMalloc(&d_moveVertex,sizeof(int));
+    int temp = -1;
+    cudaMemcpy(d_moveVertex,&temp,sizeof(int),cudaMemcpyHostToDevice);
 
     // Create our CUDA stream to run our kernals on. This helps with running kernals concurrently.
     // This is something you will not get taught by richard! Check them out at http://on-demand.gputechconf.com/gtc-express/2011/presentations/StreamsAndConcurrencyWebinar.pdf
